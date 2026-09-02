@@ -1,0 +1,2760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoFare — Road-Distance Fare & Public Safety Management System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+   :root {
+    --bg: #f4f7fb;
+    --surface: #ffffff;
+    --surface2: #eef3f9;
+    --border: #d6e4f0;
+    --text: #0f1f2e;
+    --text2: #4a6080;
+    --text3: #8ba3be;
+    --accent: #1f4e79;
+    --accent2: #4f86c6;
+    --accent-dim: rgba(31,78,121,0.10);
+    --green: #16a34a;
+    --green-dim: rgba(22,163,74,0.1);
+    --gold: #d97706;
+    --gold-dim: rgba(217,119,6,0.10);
+    --red: #c2410c;
+    --red-dim: rgba(194,65,12,0.10);
+    --shadow: 0 2px 12px rgba(37,99,235,0.07);
+    --shadow-lg: 0 8px 32px rgba(37,99,235,0.12);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --nav-w: 280px;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  html, body {
+    height:100%;
+    font-family:'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .app { display:flex; height: 100dvh; position:relative; overflow:hidden; }
+
+  .sidebar {
+    width: var(--nav-w);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    transition: transform 0.32s cubic-bezier(.4,0,.2,1), box-shadow 0.32s ease;
+    flex-shrink: 0;
+  }
+  .sidebar-header {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    font-family:'Syne', sans-serif;
+    font-size:22px; font-weight:800;
+    color: var(--accent);
+    letter-spacing:-0.5px;
+    line-height:1;
+  }
+  .logo span { color: var(--text); }
+  .logo-sub {
+    font-size:10.5px; font-weight:500;
+    color: var(--text3);
+    margin-top:4px;
+    text-transform:uppercase; letter-spacing:1.2px;
+  }
+  .nav-links { flex:1; padding:16px 12px; display:flex; flex-direction:column; gap:4px; }
+  .nav-link {
+    display:flex; align-items:center; gap:12px;
+    padding:12px 14px;
+    border-radius: var(--radius-sm);
+    cursor:pointer;
+    transition: all 0.2s;
+    font-size:14px; font-weight:500;
+    color: var(--text2);
+    border: none; background:none; text-align:left; width:100%;
+    position:relative;
+  }
+  .nav-link:hover { background: var(--surface2); color: var(--text); }
+  .nav-link.active { background: var(--accent-dim); color: var(--accent); font-weight:600; }
+  .nav-link .nav-icon { font-size:18px; flex-shrink:0; }
+  .nav-badge {
+    margin-left:auto;
+    background: var(--accent);
+    color:#fff;
+    font-size:10px; font-weight:700;
+    padding: 2px 7px;
+    border-radius:99px;
+    min-width:20px; text-align:center;
+  }
+  .nav-footer {
+    padding:16px 20px;
+    border-top:1px solid var(--border);
+    font-size:11px; color: var(--text3);
+    line-height:1.5;
+  }
+
+  button:active {
+  transform: scale(0.97);
+}
+
+.pin-row:active {
+  transform: scale(0.98);
+}
+  .menu-toggle {
+    display:none;
+    position:fixed; top:14px; left:14px;
+    z-index:999;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius:10px;
+    padding:8px 10px;
+    cursor:pointer;
+    box-shadow: var(--shadow);
+    font-size:18px;
+  }
+  .overlay {
+    display:none;
+    position:fixed; inset:0;
+    background:rgba(0,0,0,0.3);
+    z-index:99;
+    backdrop-filter:blur(2px);
+  }
+  .overlay {
+  display: none;
+  pointer-events: none;
+}
+
+.overlay.active {
+  display: block;
+  pointer-events: auto;
+}
+
+  .main {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    position:relative;
+    height:100%;
+  }
+
+  .panel {
+    display:none;
+    flex:1;
+    overflow:hidden;
+    animation: fadeUp 0.3s ease;
+    height:100%;
+  }
+  .panel.active { display:flex; flex-direction:column; }
+
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(12px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .panel-header {
+    padding: 20px 24px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink:0;
+  }
+  .panel-title {
+    font-family:'Syne', sans-serif;
+    font-size:20px; font-weight:700;
+    color: var(--text);
+    letter-spacing:-0.3px;
+  }
+  .panel-sub {
+    font-size:12.5px; color: var(--text3); margin-top:3px;
+  }
+
+  #panel-map {
+    flex-direction: row;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+  .map-wrapper {
+    flex:1;
+    position:relative;
+    overflow:hidden;
+  }
+  #map {
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    background:#e8e4dc;
+  }
+  #map {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.map-container, .main, .panel {
+  pointer-events: auto;
+}
+
+  button, .btn, .pin-row {
+  cursor: pointer;
+  pointer-events: auto;
+}
+  * {
+  touch-action: manipulation;
+}
+  .map-sidebar {
+  pointer-events: auto;
+}
+
+#map {
+  touch-action: pan-x pan-y;
+}
+  .map-sidebar {
+    width:300px;
+    background: var(--surface);
+    border-left:1px solid var(--border);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    flex-shrink:0;
+  }
+  .map-ctrl-head {
+    padding:18px 20px 12px;
+    border-bottom:1px solid var(--border);
+    flex-shrink:0;
+  }
+  .map-ctrl-title {
+    font-family:'Syne', sans-serif;
+    font-size:16px; font-weight:700;
+  }
+  .map-ctrl-sub { font-size:11.5px; color:var(--text3); margin-top:2px; }
+
+  .map-ctrl-body { padding:16px 18px; flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+
+  .pin-row {
+    display:flex; align-items:center; gap:10px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding:12px 14px;
+    border: 1.5px solid transparent;
+    transition: border-color 0.2s;
+    cursor:pointer;
+    padding: 16px 16px; /* bigger touch area */
+  }
+  .pin-row:hover { border-color: var(--border); }
+  .pin-row.active-pin { border-color: var(--accent); background: var(--accent-dim); }
+  .pin-dot {
+    width:28px; height:28px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; flex-shrink:0;
+  }
+  .pin-dot.pickup { background:#d4f0df; }
+  .pin-dot.dropoff { background:#fde8de; }
+  .pin-info { flex:1; min-width:0; }
+  .pin-label { font-size:11px; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:0.8px; }
+  .pin-addr { font-size:13px; font-weight:500; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pin-clear {
+    background:none; border:none; cursor:pointer;
+    color:var(--text3); font-size:16px; padding:2px;
+    border-radius:6px; transition:all 0.15s;
+  }
+  .pin-clear:hover { color:var(--red); background:var(--red-dim); }
+
+.map-instruction {
+  background: var(--accent-dim);
+  border-radius: var(--radius-sm);
+  padding:10px 14px;
+  font-size:12.5px;
+  color:var(--accent);
+  font-weight:500;
+  text-align:center;
+  border:1px dashed var(--accent2);
+  
+}
+
+  .fare-result {
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    border:1px solid var(--border);
+    overflow:hidden;
+  }
+  .fare-result-head {
+    padding:12px 16px;
+    background:var(--accent);
+    color:#fff;
+    font-family:'Syne', sans-serif;
+    font-size:13px; font-weight:700;
+    letter-spacing:0.3px;
+  }
+  .fare-result-body { padding:14px 16px; display:flex; flex-direction:column; gap:10px; }
+  .fare-row {
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .fare-row-label { font-size:12.5px; color:var(--text2); font-weight:500; }
+  .fare-row-value { font-size:14px; font-weight:700; }
+  .fare-row-value.regular { color:var(--text); }
+  .fare-row-value.discount { color:var(--green); }
+  .fare-row-value.distance { color:var(--accent); }
+  .fare-divider { height:1px; background:var(--border); }
+
+  .btn {
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    padding:12px 18px;
+    border-radius: var(--radius-sm);
+    font-family:'DM Sans', sans-serif;
+    font-size:13.5px; font-weight:600;
+    cursor:pointer; border:none;
+    transition:all 0.2s;
+    text-decoration:none;
+  }
+  .btn-primary {
+    background:var(--accent); color:#fff;
+  }
+  .btn-primary:hover { background:var(--accent2); transform:translateY(-1px); box-shadow:0 4px 16px rgba(224,92,42,0.3); }
+  .btn-primary:active { transform:translateY(0); }
+  .btn-secondary {
+    background:var(--surface2); color:var(--text);
+    border:1px solid var(--border);
+  }
+  .btn-secondary:hover { background:var(--border); }
+  .btn-danger { background:var(--red-dim); color:var(--red); border:1px solid rgba(192,57,43,0.2); }
+  .btn-danger:hover { background:var(--red); color:#fff; }
+  .btn-sm { padding:8px 14px; font-size:12.5px; }
+
+  /* ── FARE MATRIX PANEL ── */
+  #panel-matrix { overflow-y:auto; }
+  .matrix-content { padding:24px; max-width:700px; margin:0 auto; }
+  .matrix-table {
+    width:100%;
+    border-collapse:collapse;
+    background:var(--surface);
+    border-radius: var(--radius);
+    overflow:hidden;
+    box-shadow: var(--shadow);
+  }
+  .matrix-table th {
+    background:var(--accent);
+    color:#fff;
+    padding:14px 20px;
+    text-align:left;
+    font-size:13px; font-weight:600;
+    font-family:'Syne', sans-serif;
+    letter-spacing:0.3px;
+  }
+  .matrix-table td {
+    padding:14px 20px;
+    border-bottom:1px solid var(--border);
+    font-size:14px;
+    transition:background 0.15s;
+  }
+  .matrix-table tr:last-child td { border-bottom:none; }
+  .matrix-table tr:hover td { background:var(--surface2); }
+  .matrix-table td:first-child { font-weight:600; }
+  .fare-pill {
+    display:inline-block;
+    padding:4px 12px;
+    border-radius:99px;
+    font-size:13px; font-weight:600;
+  }
+  .fare-pill.reg { background:var(--accent-dim); color:var(--accent); }
+  .fare-pill.disc { background:var(--green-dim); color:var(--green); }
+  .matrix-note {
+    margin-top:18px;
+    background:var(--gold-dim);
+    border:1px solid var(--gold);
+    border-radius: var(--radius-sm);
+    padding:14px 18px;
+    font-size:13px; color:var(--text2); line-height:1.6;
+  }
+  .matrix-note strong { color:var(--gold); }
+
+  #panel-logs { overflow-y:auto; }
+  .logs-content { padding:24px; display:flex; flex-direction:column; gap:12px; }
+  .log-empty {
+    text-align:center; padding:60px 20px;
+    color:var(--text3); font-size:14px;
+  }
+  .log-empty .log-empty-icon { font-size:48px; margin-bottom:12px; }
+  .log-card {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding:16px 18px;
+    display:flex; align-items:flex-start; gap:14px;
+    box-shadow: var(--shadow);
+    animation: fadeUp 0.25s ease;
+  }
+  .log-num {
+    width:32px; height:32px;
+    background:var(--accent-dim);
+    color:var(--accent);
+    border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Syne', sans-serif; font-size:13px; font-weight:700;
+    flex-shrink:0;
+  }
+  .log-body { flex:1; }
+  .log-route { font-size:13.5px; font-weight:600; color:var(--text); line-height:1.4; }
+  .log-meta { display:flex; gap:12px; flex-wrap:wrap; margin-top:6px; }
+  .log-chip {
+    font-size:11.5px; font-weight:600;
+    padding:3px 10px;
+    border-radius:99px;
+  }
+  .log-chip.dist { background:var(--accent-dim); color:var(--accent); }
+  .log-chip.fare { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+  .log-chip.disc { background:var(--green-dim); color:var(--green); }
+  .log-chip.time { background:var(--gold-dim); color:var(--gold); }
+  .log-del {
+    background:none; border:none; cursor:pointer;
+    color:var(--text3); font-size:16px; padding:4px;
+    border-radius:6px; transition:all 0.15s; flex-shrink:0;
+  }
+  .log-del:hover { color:var(--red); background:var(--red-dim); }
+  .logs-toolbar {
+    display:flex; gap:10px; padding:0 24px 0; flex-shrink:0;
+    align-items:center; justify-content:space-between;
+  }
+  .logs-count { font-size:13px; color:var(--text3); }
+
+  #panel-report { overflow-y:auto; }
+  .report-content { padding:24px; max-width:600px; }
+  .form-group { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+  .form-label { font-size:12.5px; font-weight:600; color:var(--text2); text-transform:uppercase; letter-spacing:0.7px; }
+  .form-input, .form-select, .form-textarea {
+    padding:12px 14px;
+    background:var(--surface);
+    border:1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family:'DM Sans', sans-serif;
+    font-size:14px; color:var(--text);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline:none; width:100%;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus {
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-dim);
+  }
+  .form-textarea { resize:vertical; min-height:90px; }
+  .form-select { cursor:pointer; }
+  .form-hint { font-size:11.5px; color:var(--text3); margin-top:2px; }
+
+  .report-preview {
+    background:var(--surface);
+    border:2px solid var(--border);
+    border-radius: var(--radius);
+    padding:28px;
+    margin-top:20px;
+    font-size:13px;
+    display:none;
+    box-shadow: var(--shadow-lg);
+  }
+  .report-preview.visible { display:block; animation:fadeUp 0.3s ease; }
+  .rp-header {
+    text-align:center; border-bottom:2px solid var(--border);
+    padding-bottom:16px; margin-bottom:16px;
+  }
+  .rp-badge {
+    display:inline-block;
+    background:var(--red-dim);
+    color:var(--red);
+    font-size:10px; font-weight:700;
+    padding:3px 12px; border-radius:99px;
+    letter-spacing:1px; text-transform:uppercase;
+    margin-bottom:8px; border:1px solid rgba(192,57,43,0.2);
+  }
+  .rp-title { font-family:'Syne', sans-serif; font-size:18px; font-weight:800; color:var(--text); }
+  .rp-sub { font-size:11.5px; color:var(--text3); margin-top:2px; }
+  .rp-field { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--surface2); }
+  .rp-field:last-child { border-bottom:none; }
+  .rp-key { width:140px; font-weight:600; color:var(--text2); font-size:12px; flex-shrink:0; }
+  .rp-val { color:var(--text); font-size:13px; }
+  .rp-footer { text-align:center; margin-top:16px; font-size:11px; color:var(--text3); border-top:1px solid var(--border); padding-top:12px; }
+  .rp-ref { font-family:'Syne', sans-serif; font-size:14px; font-weight:700; color:var(--accent); }
+
+  /* ── ABOUT PANEL ── */
+  #panel-about { overflow-y:auto; }
+  .about-content { padding:32px; max-width:640px; }
+  .about-hero {
+    background:var(--accent);
+    border-radius:var(--radius);
+    padding:32px;
+    color:#fff;
+    margin-bottom:28px;
+    position:relative; overflow:hidden;
+  }
+  .about-hero::before {
+    content:'';
+    position:absolute; top:-30px; right:-30px;
+    width:160px; height:160px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.08);
+  }
+  .about-hero-tag {
+    font-size:11px; font-weight:700;
+    text-transform:uppercase; letter-spacing:1.5px;
+    opacity:0.75; margin-bottom:10px;
+  }
+  .about-hero-title { font-family:'Syne', sans-serif; font-size:28px; font-weight:800; line-height:1.2; }
+  .about-hero-sub { font-size:14px; opacity:0.8; margin-top:8px; line-height:1.6; }
+  .about-section { margin-bottom:28px; }
+  .about-section-title {
+    font-family:'Syne', sans-serif; font-size:15px; font-weight:700;
+    margin-bottom:12px; color:var(--accent);
+    display:flex; align-items:center; gap:8px;
+  }
+  .about-section p { font-size:14px; color:var(--text2); line-height:1.75; margin-bottom:10px; }
+  .about-card {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    padding:20px 22px;
+    display:flex; gap:16px; align-items:flex-start;
+    box-shadow:var(--shadow);
+  }
+  .about-avatar {
+    width:52px; height:52px;
+    background:var(--accent);
+    border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px; flex-shrink:0;
+  }
+  .about-name { font-family:'Syne', sans-serif; font-size:16px; font-weight:700; }
+  .about-role { font-size:12.5px; color:var(--text3); margin-top:3px; line-height:1.5; }
+  .fare-ref-box {
+    background:var(--gold-dim);
+    border:1px solid var(--gold);
+    border-radius:var(--radius-sm);
+    padding:14px 18px;
+    font-size:13px; color:var(--text2); line-height:1.6;
+  }
+  .fare-ref-box strong { color:var(--gold); }
+
+  .toast-wrap {
+    position:fixed; bottom:24px; right:24px;
+    z-index:9999;
+    display:flex; flex-direction:column; gap:8px;
+    pointer-events:none;
+  }
+  .toast {
+    padding:12px 18px;
+    border-radius:var(--radius-sm);
+    font-size:13.5px; font-weight:500;
+    color:#fff;
+    box-shadow:var(--shadow-lg);
+    animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+    pointer-events:auto;
+  }
+  .toast.success { background:var(--green); }
+  .toast.error   { background:var(--red); }
+  .toast.info    { background:var(--accent); }
+  @keyframes toastIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+  @keyframes toastOut { to { opacity:0; transform:translateX(20px); } }
+
+  #mobile-fare-float {
+    display: none; /* hidden on desktop, shown via JS on mobile */
+  }
+
+  @media(max-width:768px) {
+    #mobile-fare-float {
+      display: none; /* JS controls visibility */
+      position: absolute;
+      bottom: 268px;
+      left: 12px; right: 12px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      z-index: 30;
+      box-shadow: 0 4px 28px rgba(0,0,0,0.15);
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+    }
+    #mobile-fare-float.visible {
+      display: flex;
+    }
+    .mff-rows {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .mff-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mff-label {
+      font-size: 12px;
+      color: var(--text2);
+      font-weight: 500;
+    }
+    .mff-label small {
+      font-size: 10.5px;
+      color: var(--text3);
+      font-weight: 400;
+    }
+    .mff-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .mff-val.accent { color: var(--accent); }
+    .mff-val.green  { color: var(--green);  }
+    .mff-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 2px 0;
+    }
+    .mff-close {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      color: var(--text3);
+      cursor: pointer;
+      flex-shrink: 0;
+      align-self: flex-start;
+    }
+  }
+
+@media(max-width:768px) {
+
+  /* Show hamburger */
+  .menu-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 400;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: min(var(--nav-w), 82vw);
+    transform: translateX(-100%);
+    z-index: 350;
+    box-shadow: 4px 0 32px rgba(0,0,0,0.18);
+  }
+  .sidebar.active {
+    transform: translateX(0);
+  }
+
+  .overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 300 !important;
+    background: rgba(0,0,0,0.38) !important;
+    backdrop-filter: blur(3px);
+    display: none !important;
+    pointer-events: none;
+  }
+  .overlay.active {
+    display: block !important;
+    pointer-events: auto;
+  }
+
+  .main { width: 100%; }
+
+  .panel-header {
+    padding-left: 60px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  #panel-map {
+    flex-direction: column;
+    position: relative;
+  }
+
+  .map-wrapper {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+  }
+
+  .map-sidebar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    width: 100%;
+    height: 260px;
+    min-height: 160px;
+    max-height: 82vh;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -6px 28px rgba(0,0,0,0.13);
+    transition: height 0.25s cubic-bezier(.4,0,.2,1);
+    z-index: 20;
+  }
+
+  .map-ctrl-head::before {
+    content: '';
+    display: block;
+    width: 40px; height: 4px;
+    background: var(--border);
+    border-radius: 99px;
+    margin: 0 auto 10px;
+  }
+
+  .map-ctrl-head {
+    padding-top: 14px;
+  }
+
+  .map-ctrl-body {
+    padding: 10px 14px 14px;
+    gap: 10px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #fare-result  { order: -2; }
+  #fare-actions { order: -1; }
+
+  .map-mode-btn {
+    min-height: 44px;
+    font-size: 13px;
+  }
+
+  .pin-row { padding: 13px 12px; }
+  .pin-clear { padding: 8px; min-width: 32px; min-height: 32px; display:flex; align-items:center; justify-content:center; }
+
+  .btn { min-height: 44px; }
+
+  .matrix-content {
+    padding: 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .matrix-table {
+    font-size: 13px;
+    min-width: 420px;
+  }
+  .matrix-table th,
+  .matrix-table td {
+    padding: 11px 14px;
+  }
+  .matrix-note { font-size: 12.5px; }
+
+  /* ── LOGS ── */
+  .logs-toolbar { padding: 12px 16px 0; }
+  .logs-content { padding: 12px 16px 16px; }
+  .log-card { padding: 12px 13px; gap: 10px; }
+
+  /* ── REPORT ── */
+  .report-content { padding: 16px; max-width: 100%; }
+  .report-preview { padding: 18px; }
+  .rp-key { width: 110px; font-size: 11.5px; }
+  .rp-val { font-size: 12.5px; }
+  .rp-field { gap: 8px; }
+
+  /* Report action buttons: full-width stack */
+  #report-actions { flex-direction: column; }
+  #report-actions .btn { width: 100%; justify-content: center; }
+
+  /* ── ABOUT ── */
+  .about-content { padding: 16px; max-width: 100%; }
+  .about-hero { padding: 22px 20px; }
+  .about-hero-title { font-size: 22px; }
+  .about-card { padding: 16px; }
+
+
+  .toast-wrap {
+    bottom: 280px;
+    right: 14px;
+    left: 14px;
+    align-items: center;
+  }
+  .toast { text-align: center; width: 100%; }
+
+
+  .map-ctrl-title { font-size: 15px; }
+  .map-ctrl-sub { font-size: 11px; }
+
+
+  .fare-result-body { padding: 12px 14px; gap: 8px; }
+  .fare-result-head { padding: 10px 14px; font-size: 12px; }
+  .fare-row-label { font-size: 12px; }
+  .fare-row-value { font-size: 13.5px; }
+}
+
+
+@media(max-width:380px) {
+  .panel-header { padding-left: 54px; }
+  .sidebar { width: 85vw; }
+  .about-hero-title { font-size: 19px; }
+  .matrix-table { min-width: 360px; }
+  .toast-wrap { bottom: 270px; }
+}
+
+
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:99px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--text3); }
+
+
+  .leaflet-popup-content-wrapper {
+    border-radius:10px !important;
+    box-shadow:var(--shadow-lg) !important;
+    font-family:'DM Sans', sans-serif !important;
+  }
+  .leaflet-popup-content { font-size:13px !important; }
+  .custom-pin {
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .custom-pin-dot {
+    width:20px; height:20px;
+    border-radius:50%;
+    border:3px solid #fff;
+    box-shadow:0 2px 8px rgba(0,0,0,0.25);
+  }
+  .custom-pin-line {
+    width:2px; height:14px;
+    background:rgba(0,0,0,0.2);
+  }
+  .leaflet-routing-container { display:none !important; }
+
+
+  @keyframes dash { to { stroke-dashoffset:0; } }
+
+  .section-divider {
+    height:1px; background:var(--border);
+    margin:4px 0;
+  }
+
+  .loading-line {
+    height:3px;
+    background:linear-gradient(90deg, transparent, var(--accent), transparent);
+    background-size:200%;
+    animation: shimmer 1.5s infinite;
+    border-radius:99px;
+    margin-bottom:6px;
+    display:none;
+  }
+  .loading-line.active { display:block; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  .map-mode-btns {
+    display:flex; gap:6px; margin-bottom:10px;
+  }
+  .map-mode-btn {
+    flex:1; padding:12px;
+    border-radius:8px;
+    font-size:14px; font-weight:600;
+    border:1.5px solid var(--border);
+    background:var(--surface);
+    cursor:pointer; transition:all 0.15s;
+    color:var(--text2);
+  }
+  .map-mode-btn.active-mode {
+    background:var(--accent-dim);
+    border-color:var(--accent);
+    color:var(--accent);
+  }
+
+  .report-list { display:flex; flex-direction:column; gap:12px; margin-top:16px; }
+  .report-card {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-left:4px solid var(--red);
+    border-radius:var(--radius-sm);
+    padding:14px 16px;
+    animation:fadeUp 0.25s ease;
+  }
+  .report-card-head { display:flex; align-items:center; justify-content:space-between; }
+  .report-card-plate {
+    font-family:'Syne', sans-serif; font-size:15px; font-weight:800;
+    color:var(--red); letter-spacing:1px;
+  }
+  .report-card-date { font-size:11px; color:var(--text3); }
+  .report-card-reason { font-size:12.5px; color:var(--text2); margin-top:6px; line-height:1.5; }
+.overlay {
+  display: none;
+}
+
+.overlay.active {
+  display: block;
+}
+
+
+.topbar{height:64px;flex-shrink:0;background:rgba(255,255,255,.96);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 22px;z-index:50}
+.topbar-title{display:flex;flex-direction:column;min-width:0}.topbar-title .eyebrow{font-size:9px;letter-spacing:1.4px;color:var(--text3);font-weight:700}.topbar-title strong{font-family:'Syne',sans-serif;font-size:17px}
+.topbar-actions{display:flex;align-items:center;gap:8px}.dev-badge{font-size:9px;font-weight:800;letter-spacing:.8px;padding:5px 8px;border-radius:99px;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+.icon-btn{width:34px;height:34px;border:1px solid var(--border);background:var(--surface);border-radius:10px;cursor:pointer}
+.management-content{padding:24px;overflow:auto;flex:1;max-width:1100px;width:100%;margin:0 auto}.toolbar-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.toolbar-row .form-input,.toolbar-row .form-select{flex:1;min-width:180px}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.data-card,.form-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:18px;box-shadow:var(--shadow)}
+.form-card h3{font-size:15px;margin-bottom:14px;font-family:'Syne',sans-serif}.info-banner{background:var(--accent-dim);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:12.5px;line-height:1.5;color:var(--text2);margin-bottom:16px}
+.status-badge{display:inline-flex;align-items:center;padding:4px 9px;border-radius:99px;font-size:10px;font-weight:800}.status-verified,.status-resolved{background:var(--green-dim);color:var(--green)}.status-pending,.status-review{background:var(--gold-dim);color:var(--gold)}.status-rejected,.status-dismissed,.status-suspended{background:var(--red-dim);color:var(--red)}
+.card-title{font-weight:700;font-size:14px}.muted{color:var(--text3);font-size:12px}.score-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px}.score-row:last-child{border-bottom:0}
+.rating-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}.rating-grid label{font-size:11px;font-weight:700;color:var(--text2)}.rating-grid input{width:100%;margin-top:5px;padding:10px;border:1px solid var(--border);border-radius:8px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px}.stat-card .stat-value{font:800 24px 'Syne',sans-serif}.stat-card .stat-label{font-size:11px;color:var(--text3);margin-top:3px}.admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.table-wrap{overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm)}.data-table{width:100%;border-collapse:collapse;min-width:650px}.data-table th,.data-table td{padding:11px 13px;border-bottom:1px solid var(--border);font-size:12px;text-align:left}.data-table th{background:var(--surface2);font-weight:800}.data-table tr:last-child td{border-bottom:0}
+.auth-screen{position:fixed;inset:0;z-index:3000;background:linear-gradient(135deg,#f4f7fb,#eaf2f9);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}.auth-screen.hidden{display:none}.auth-card{width:min(520px,100%);background:#fff;border:1px solid var(--border);border-radius:22px;box-shadow:var(--shadow-lg);padding:30px}.auth-brand{font:800 28px 'Syne',sans-serif;color:var(--accent)}.auth-brand span{color:var(--text)}.auth-kicker{font-size:9px;letter-spacing:1.4px;color:var(--text3);font-weight:800;margin-top:4px}.auth-card h1{font:800 25px 'Syne',sans-serif;margin-top:24px}.auth-sub{font-size:13px;color:var(--text2);line-height:1.5;margin:6px 0 18px}.auth-alert{display:none;padding:10px 12px;border-radius:9px;font-size:12px;margin-bottom:12px}.auth-alert.show{display:block}.auth-alert.error{background:var(--red-dim);color:var(--red);border:1px solid rgba(220,38,38,.2)}.auth-alert.success{background:var(--green-dim);color:var(--green);border:1px solid rgba(22,163,74,.2)}.auth-submit{width:100%;margin-top:2px}.auth-switch{text-align:center;margin-top:15px;font-size:12px;color:var(--text2)}.auth-switch button{border:0;background:none;color:var(--accent);font-weight:700;cursor:pointer}.demo-note{margin-top:16px;padding:11px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;font-size:11px;line-height:1.5;color:#9a3412}.auth-credit{margin-top:18px;padding-top:15px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);line-height:1.5;text-align:center}
+.loading-overlay{position:fixed;inset:0;z-index:2800;background:rgba(15,31,46,.25);display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}.loading-overlay.active{display:flex}.loading-card{background:#fff;border-radius:14px;padding:18px 22px;box-shadow:var(--shadow-lg);font-size:13px}
+@media(max-width:900px){.admin-grid{grid-template-columns:1fr}.rating-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.topbar{padding:0 12px 0 58px}.topbar-actions .dev-badge{display:none}.management-content{padding:16px}.auth-card{padding:22px}.rating-grid{grid-template-columns:1fr 1fr}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+
+
+:root{
+  --blue-soft:#eaf2f8; --orange:#d97706; --orange-soft:#fff7ed;
+  --success:#15803d; --success-soft:#ecfdf3;
+  --danger:#b42318; --danger-soft:#fef3f2;
+  --info:#2563eb; --info-soft:#eff6ff;
+}
+.app{background:var(--bg)}
+.topbar{box-shadow:0 1px 8px rgba(15,31,46,.04)}
+.sidebar-header{background:linear-gradient(180deg,#fff,#f8fbfe)}
+.nav-link.active{box-shadow:inset 3px 0 0 var(--accent)}
+.role-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;font-size:10px;font-weight:800;background:var(--blue-soft);color:var(--accent);border:1px solid #cbdbea}
+.section-label{font-size:10px;font-weight:800;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin:8px 4px 2px}
+.dashboard-wrap{padding:24px;overflow:auto;flex:1;max-width:1250px;width:100%;margin:0 auto}
+.hero-grid{display:grid;grid-template-columns:1.45fr .8fr;gap:16px;margin-bottom:18px}
+.hero-card{background:linear-gradient(135deg,#1f4e79,#2f6696);color:#fff;border-radius:18px;padding:24px;position:relative;overflow:hidden}
+.hero-card:after{content:"";position:absolute;width:190px;height:190px;border:1px solid rgba(255,255,255,.12);border-radius:50%;right:-55px;top:-70px}
+.hero-card h2{font:800 25px 'Syne',sans-serif;line-height:1.2;margin-bottom:8px}
+.hero-card p{font-size:13px;line-height:1.65;opacity:.9;max-width:700px}
+.hero-card .hero-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
+.hero-stat{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+.hero-stat .kicker{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:800}
+.hero-stat .big{font:800 30px 'Syne',sans-serif;margin-top:7px;color:var(--accent)}
+.hero-stat .small{font-size:12px;color:var(--text2);margin-top:3px;line-height:1.4}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:15px;box-shadow:var(--shadow)}
+.kpi .kpi-icon{font-size:20px}.kpi .kpi-value{font:800 22px 'Syne',sans-serif;margin-top:6px}.kpi .kpi-label{font-size:11px;color:var(--text3);margin-top:2px}
+.dashboard-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+.alert-card{border:1px solid #fed7aa;background:var(--orange-soft);border-radius:14px;padding:15px}
+.alert-card strong{color:#9a3412}
+.sos-card{border:1px solid #fdba74;background:linear-gradient(180deg,#fff7ed,#fff);border-radius:14px;padding:14px}
+.sos-card .sos-title{font-weight:800;color:#9a3412}
+.sos-btn{background:#c2410c;color:#fff;border:0}
+.sos-btn:hover{background:#9a3412}
+.status-new{background:#fff7ed;color:#9a3412}
+.status-under-review{background:#fffbeb;color:#a16207}
+.status-acknowledged{background:#eff6ff;color:#1d4ed8}
+.status-responded,.status-resolved{background:#ecfdf3;color:#15803d}
+.status-dismissed,.status-rejected{background:#fef3f2;color:#b42318}
+.status-verified{background:#ecfdf3;color:#15803d}
+.status-pending{background:#fffbeb;color:#a16207}
+.status-rejected{background:#fef3f2;color:#b42318}
+.danger-outline{border:1px solid #fdba74!important;background:#fff7ed!important;color:#9a3412!important}
+.empty-state{background:#fff;border:1px dashed var(--border);border-radius:14px;padding:35px;text-align:center;color:var(--text3)}
+.map-safety-strip{border:1px solid #fdba74;background:#fff7ed;border-radius:12px;padding:11px 12px;font-size:11.5px;line-height:1.5;color:#7c2d12}
+.map-safety-strip strong{color:#9a3412}
+.fare-method{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--text3);padding-top:8px;border-top:1px solid var(--border)}
+.route-record{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.route-record:last-child{border-bottom:0}
+.route-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);flex:none}
+.table-actions{display:flex;gap:6px;flex-wrap:wrap}
+.small-note{font-size:11px;color:var(--text3);line-height:1.5}
+@media(max-width:1000px){.hero-grid,.dashboard-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.dashboard-wrap{padding:16px}.kpi-grid{grid-template-columns:1fr 1fr}.hero-card h2{font-size:21px}}
+@media(max-width:520px){.kpi-grid{grid-template-columns:1fr}.hero-grid{gap:10px}}
+
+.status-active{background:var(--green-dim);color:var(--green)}
+
+/* ── Micro-interactions & motion polish ── */
+body,.sidebar,.topbar,.surface,.auth-card,.data-card,.form-card,.stat-card,.kpi,.hero-stat{transition:background-color .25s ease,border-color .25s ease,color .25s ease}
+.kpi,.stat-card,.data-card{transition:background-color .25s ease,border-color .25s ease,transform .18s ease,box-shadow .18s ease}
+.kpi:hover,.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.nav-link{transition:background-color .18s ease,color .18s ease,box-shadow .18s ease,padding-left .18s ease}
+.nav-link:hover{padding-left:17px}
+@keyframes sosPulse{0%,100%{box-shadow:0 0 0 0 rgba(194,65,12,.35)}50%{box-shadow:0 0 0 9px rgba(194,65,12,0)}}
+.sos-btn{animation:sosPulse 2.4s ease-in-out infinite}
+.status-badge{transition:background-color .2s ease,color .2s ease}
+.kpi-value,.stat-value{transition:color .2s ease}
+.table-actions .btn{transition:background-color .18s ease,transform .15s ease}
+.table-actions .btn:hover{transform:translateY(-1px)}
+
+/* ── Sidebar collapse toggle (desktop) ── */
+.sidebar-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.collapse-toggle{flex-shrink:0;width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .18s ease}
+.collapse-toggle:hover{background:var(--border);color:var(--text)}
+.sidebar{transition:transform .32s cubic-bezier(.4,0,.2,1), box-shadow .32s ease, width .22s ease}
+.sidebar.collapsed{width:74px}
+.sidebar.collapsed .logo-sub,.sidebar.collapsed .nav-label,.sidebar.collapsed .nav-badge,.sidebar.collapsed .nav-footer,.sidebar.collapsed .logo{display:none}
+.sidebar.collapsed .sidebar-header{justify-content:center}
+.sidebar.collapsed .nav-link{justify-content:center;padding:12px 0}
+.sidebar.collapsed .collapse-toggle{margin:0 auto}
+@media(max-width:768px){.collapse-toggle{display:none}}
+
+/* ── Theme toggle / dark mode ── */
+.icon-btn{transition:background-color .18s ease,color .18s ease,transform .15s ease;font-size:15px;display:flex;align-items:center;justify-content:center}
+.icon-btn:hover{background:var(--surface2);transform:translateY(-1px)}
+:root[data-theme="dark"]{
+  --bg:#0a1420; --surface:#101c2c; --surface2:#15243a; --border:#233248;
+  --text:#eaf2fb; --text2:#a7bcd6; --text3:#6c84a3;
+  --accent:#5b95d6; --accent2:#82b3ec; --accent-dim:rgba(91,149,214,0.18);
+  --shadow:0 2px 14px rgba(0,0,0,0.35); --shadow-lg:0 10px 34px rgba(0,0,0,0.45);
+}
+:root[data-theme="dark"] .auth-screen{background:linear-gradient(135deg,#08111c,#0f1c2c)}
+:root[data-theme="dark"] .about-avatar,:root[data-theme="dark"] .hero-card{color:#eaf2fb}
+:root[data-theme="dark"] #map{background:#0a1420}
+:root[data-theme="dark"] .dev-badge{background:#2a1c10;color:#fbbf7a;border-color:#5a3a1c}
+:root[data-theme="dark"] .demo-note{background:#241a0e;color:#f2c48b;border-color:#5a3a1c}
+:root[data-theme="dark"] .status-new{background:#2a1c10;color:#fbbf7a}
+:root[data-theme="dark"] .fare-pill.reg,:root[data-theme="dark"] .kpi-icon{filter:none}
+:root[data-theme="dark"] .leaflet-popup-content-wrapper{background:#101c2c;color:#eaf2fb}
+@media(prefers-reduced-motion:reduce){.sos-btn{animation:none}.kpi:hover,.stat-card:hover{transform:none}}
+
+</style>
+</head>
+<body>
+<button class="menu-toggle" onclick="toggleSidebar()" title="Menu">☰</button>
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">Geo<span>Fare</span></div>
+    <div class="auth-kicker">MANOLO FORTICH · BUKIDNON</div>
+    <h1 id="auth-title">Sign in to GeoFare</h1>
+    <p class="auth-sub">GIS-based habal-habal fare computation, fare management, and public safety/accountability.</p>
+    <div id="auth-alert" class="auth-alert" role="alert"></div>
+    <form id="login-form">
+      <div class="form-group"><label class="form-label" for="login-email">Email</label><input class="form-input" id="login-email" type="email" required autocomplete="email"></div>
+      <div class="form-group"><label class="form-label" for="login-password">Password</label><input class="form-input" id="login-password" type="password" required autocomplete="current-password"></div>
+      <button class="btn btn-primary auth-submit" type="submit">Sign in</button>
+    </form>
+    <form id="signup-form" style="display:none">
+      <div class="form-group"><label class="form-label" for="signup-name">Full Name</label><input class="form-input" id="signup-name" required maxlength="120"></div>
+      <div class="form-group"><label class="form-label" for="signup-email">Email</label><input class="form-input" id="signup-email" type="email" required></div>
+      <div class="form-group"><label class="form-label" for="signup-password">Password</label><input class="form-input" id="signup-password" type="password" minlength="8" required></div>
+      <div class="form-group"><label class="form-label" for="signup-confirm">Confirm Password</label><input class="form-input" id="signup-confirm" type="password" minlength="8" required></div>
+      <div class="form-group"><label class="form-label" for="signup-contact">Contact Number</label><input class="form-input" id="signup-contact" maxlength="30"></div>
+      <div class="form-group"><label class="form-label" for="signup-address">Address / Barangay</label><input class="form-input" id="signup-address" maxlength="180"></div>
+      <div class="form-group"><label class="form-label" for="signup-role">Account Type</label><select class="form-select" id="signup-role"><option value="commuter">Commuter</option><option value="rider">Habal-Habal Rider</option></select></div>
+      <div id="rider-fields" style="display:none">
+        <div class="form-group"><label class="form-label" for="signup-permit">Business Permit / Verification Reference</label><input class="form-input" id="signup-permit" maxlength="80"></div>
+        <div class="form-group"><label class="form-label" for="signup-service-area">Service Area</label><input class="form-input" id="signup-service-area" maxlength="160"></div>
+      </div>
+      <button class="btn btn-primary auth-submit" type="submit">Create account</button>
+    </form>
+    <div class="auth-switch"><span id="auth-switch-text">Need an account?</span> <button id="auth-switch" type="button">Sign up</button></div>
+    <div class="demo-note" id="demo-note"></div>
+    <div class="auth-credit">Northern Bukidnon State College · Institute for Computer Studies<br>Researchers: Auggie John Fred G. Manginsay · Rian S. Cat-awan · Weniel A. Raña</div>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div>
+        <div class="logo">Geo<span>Fare</span></div>
+        <div class="logo-sub">Manolo Fortich • Habal-Habal</div>
+      </div>
+      <button class="collapse-toggle" id="sidebar-collapse-btn" title="Collapse sidebar" type="button">⟨</button>
+    </div>
+    
+<nav class="nav-links" id="role-nav" aria-label="Primary navigation"></nav>
+
+    <div class="nav-footer" id="nav-footer">
+      Based on Joint Resolution No.1 s. 2026<br>
+      Sangguniang Bayan–Habal-Habal Associations–MFRTA-CADO<br>
+      <span style="color:var(--accent);font-weight:600">Manolo Fortich, Bukidnon</span>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+<div class="topbar" id="topbar">
+  <div class="topbar-title">
+    <span class="eyebrow">GEOSPATIAL TRANSPORTATION SYSTEM</span>
+    <strong id="role-heading">GeoFare</strong>
+  </div>
+  <div class="topbar-actions">
+    <span class="dev-badge" id="mode-badge">DEVELOPMENT MODE</span>
+    <button class="icon-btn" id="theme-toggle" title="Toggle dark / light mode" type="button">🌙</button>
+    <button class="icon-btn" id="profile-btn" title="Open profile">◯</button>
+    <button class="btn btn-secondary btn-sm" id="logout-btn">Log out</button>
+  </div>
+</div>
+
+
+
+    <div class="panel active" id="panel-map">
+      <div class="map-wrapper">
+        <div id="map"></div>
+
+
+        <div id="mobile-fare-float">
+          <div class="mff-rows">
+            <div class="mff-row">
+              <span class="mff-label">📏 Distance</span>
+              <strong class="mff-val" id="mff-dist">—</strong>
+            </div>
+            <div class="mff-divider"></div>
+            <div class="mff-row">
+              <span class="mff-label">Regular Fare</span>
+              <strong class="mff-val accent" id="mff-reg">—</strong>
+            </div>
+            <div class="mff-row">
+              <span class="mff-label">Discounted <small>(PWD · SP · Senior)</small></span>
+              <strong class="mff-val green" id="mff-disc">—</strong>
+            </div>
+          </div>
+          <button class="mff-close" onclick="clearAll()" title="Reset">✕</button>
+        </div>
+
+      </div>
+      <div class="map-sidebar">
+        <div class="map-ctrl-head">
+          <div class="map-ctrl-title">📍 Set Route</div>
+          <div class="map-ctrl-sub">Tap on map • Distance via actual roads</div>
+          <div class="loading-line" id="loading-line"></div>
+        </div>
+        <div class="map-ctrl-body">
+          <!-- Mode -->
+          <div class="map-mode-btns">
+            <button class="map-mode-btn active-mode" id="mode-pickup" onclick="setMode('pickup')">🟢 Pickup</button>
+            <button class="map-mode-btn" id="mode-dropoff" onclick="setMode('dropoff')">🔴 Drop-off</button>
+          </div>
+          <button class="btn btn-secondary btn-sm" type="button" id="locate-btn">◎ Use my current location</button>
+
+          <!-- Pickup -->
+          <div class="pin-row" id="pickup-row" onclick="setMode('pickup')">
+            <div class="pin-dot pickup">🟢</div>
+            <div class="pin-info">
+              <div class="pin-label">Pickup Point</div>
+              <div class="pin-addr" id="pickup-addr">Tap map to set</div>
+            </div>
+            <button class="pin-clear" onclick="clearPin('pickup');event.stopPropagation()" title="Clear">✕</button>
+          </div>
+
+          <!-- Dropoff -->
+          <div class="pin-row" id="dropoff-row" onclick="setMode('dropoff')">
+            <div class="pin-dot dropoff">🔴</div>
+            <div class="pin-info">
+              <div class="pin-label">Drop-off Point</div>
+              <div class="pin-addr" id="dropoff-addr">Tap map to set</div>
+            </div>
+            <button class="pin-clear" onclick="clearPin('dropoff');event.stopPropagation()" title="Clear">✕</button>
+          </div>
+
+          <!-- Instructions -->
+          <div class="map-instruction" id="map-instruction">
+            Tap anywhere on the map to set your <strong>pickup</strong> point
+          </div>
+
+          <!-- Fare Result -->
+          <div class="fare-result" id="fare-result" style="display:none">
+            <div class="fare-result-head">🧾 Estimated Fare</div>
+            <div class="fare-result-body">
+              <div class="fare-row">
+                <span class="fare-row-label">📏 Distance</span>
+                <span class="fare-row-value distance" id="res-distance">—</span>
+              </div>
+              <div class="fare-divider"></div>
+              <div class="fare-row">
+                <span class="fare-row-label">Regular Fare</span>
+                <span class="fare-row-value regular" id="res-regular">—</span>
+              </div>
+              <div class="fare-row">
+                <span class="fare-row-label">Discounted Fare<br><small style="font-weight:400;color:var(--text3)">PWD · SP · Senior</small></span>
+                <span class="fare-row-value discount" id="res-discount">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Buttons -->
+          <div id="fare-actions" style="display:none; flex-direction:column; gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="calculateFare(true)" id="calculate-btn">
+              🧮 Calculate Fare
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="saveLog()" id="save-btn" style="display:none">
+              💾 Save to History
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="clearAll()">
+              🔄 Reset Route
+            </button>
+          </div>
+          <div class="map-safety-strip">
+            <strong>Public safety:</strong> If you need assistance, use <b>Send SOS Alert</b>. GeoFare records the alert for authorized responders/MFRTA; it is not a replacement for emergency services.
+          </div>
+          <button class="btn sos-btn btn-sm" id="sos-map-btn" type="button">🆘 Send SOS Alert</button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ── ROLE DASHBOARDS ── -->
+    <div class="panel" id="panel-commuter-dashboard">
+      <div class="panel-header">
+        <div class="panel-title">Commuter Dashboard</div>
+        <div class="panel-sub">Fare computation, route visibility, rider verification, and public safety.</div>
+      </div>
+      <div class="dashboard-wrap">
+        <div class="hero-grid">
+          <section class="hero-card">
+            <div class="role-chip" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.2)">COMMUTER</div>
+            <h2>Know your fare before you ride.</h2>
+            <p>Set your pickup and drop-off points on the Manolo Fortich map. GeoFare uses road-network distance and the active fare matrix to produce a transparent fare reference.</p>
+            <div class="hero-meta"><span class="role-chip" style="background:#fff;color:#1f4e79;border:0">Road distance</span><span class="role-chip" style="background:#fff;color:#1f4e79;border:0">Official matrix reference</span></div>
+          </section>
+          <section class="hero-stat"><div class="kicker">Account</div><div class="big" id="commuter-name">Commuter</div><div class="small" id="commuter-status">Active account</div><button class="btn btn-primary btn-sm" style="margin-top:14px;width:100%" data-panel="map">Open Fare Calculator</button></section>
+        </div>
+        <div class="kpi-grid" id="commuter-kpis"></div>
+        <div class="dashboard-grid">
+          <section class="form-card"><h3>Quick actions</h3><div class="card-grid">
+            <button class="btn btn-secondary" data-panel="map">🗺️ Calculate Fare</button>
+            <button class="btn btn-secondary" data-panel="matrix">📋 View Fare Matrix</button>
+            <button class="btn btn-secondary" data-panel="riders">✓ Verify Riders</button>
+            <button class="btn danger-outline" data-panel="safety">🆘 Safety & SOS</button>
+          </div></section>
+          <section class="form-card"><h3>Latest safety information</h3><div id="commuter-safety-summary"></div></section>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-rider-dashboard">
+      <div class="panel-header">
+        <div class="panel-title">Habal-Habal Rider Dashboard</div>
+        <div class="panel-sub">Fare compliance, rider verification status, ratings, and safety alerts.</div>
+      </div>
+      <div class="dashboard-wrap">
+        <div class="hero-grid">
+          <section class="hero-card">
+            <div class="role-chip" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.2)">HABAL-HABAL RIDER</div>
+            <h2>Serve fairly. Ride safely.</h2>
+            <p>Use the active fare matrix as the reference for compliance. Authorized management can verify your rider account and review accountability records.</p>
+          </section>
+          <section class="hero-stat"><div class="kicker">Verification</div><div class="big" id="rider-verification">Pending</div><div class="small" id="rider-public-id">Public ID —</div></section>
+        </div>
+        <div class="kpi-grid" id="rider-kpis"></div>
+        <div class="dashboard-grid">
+          <section class="form-card">
+            <h3>Fare compliance checker</h3>
+            <p class="small-note" style="margin-bottom:12px">Enter the road distance and fare actually collected to compare it with the active matrix.</p>
+            <div class="toolbar-row">
+              <input class="form-input" type="number" min="0.1" step="0.01" id="rider-check-distance" placeholder="Distance (km)">
+              <input class="form-input" type="number" min="0" step="0.01" id="rider-check-charged" placeholder="Fare collected (₱)">
+              <button class="btn btn-primary btn-sm" type="button" id="rider-check-btn">Check</button>
+            </div>
+            <div id="rider-fare-summary"></div>
+            <button class="btn btn-secondary btn-sm" style="margin-top:12px" data-panel="matrix">View active fare matrix</button>
+          </section>
+          <section class="form-card"><h3>Safety alerts</h3><div id="rider-alert-summary"></div><button class="btn btn-secondary btn-sm" style="margin-top:12px" data-panel="safety">Open safety center</button></section>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-safety">
+      <div class="panel-header">
+        <div class="panel-title">Public Safety Center</div>
+        <div class="panel-sub">SOS alerts and incident records coordinated through authorized GeoFare users.</div>
+      </div>
+      <div class="management-content">
+        <div class="alert-card"><strong>Important:</strong> GeoFare is an accountability and alert-recording feature. It does not replace 911, police, medical, or other emergency services.</div>
+        <div class="dashboard-grid" style="margin-top:16px">
+          <section class="form-card" id="sos-form-card">
+            <h3>Send SOS Alert</h3>
+            <p class="small-note" style="margin-bottom:14px">Use only when you need assistance related to a transportation or safety incident. Your current location may be attached when location permission is available.</p>
+            <div class="form-group"><label class="form-label">Alert message</label><textarea class="form-textarea" id="sos-message" maxlength="500" placeholder="Briefly describe what is happening."></textarea></div>
+            <button class="btn sos-btn" id="sos-submit">🆘 Send SOS Alert</button>
+          </section>
+          <section class="form-card">
+            <h3 id="safety-list-title">My recent alerts</h3>
+            <div id="my-safety-alerts"></div>
+          </section>
+        </div>
+        <section class="form-card" id="admin-safety-block" style="display:none;margin-top:16px">
+          <h3>Management alert queue</h3>
+          <div id="admin-safety-content"></div>
+        </section>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-responder">
+      <div class="panel-header">
+        <div class="panel-title">Responder Safety Dashboard</div>
+        <div class="panel-sub">Receive, acknowledge, and record responses to GeoFare SOS alerts.</div>
+      </div>
+      <div class="management-content">
+        <div class="stats-grid" id="responder-stats"></div>
+        <div class="form-card"><h3>Incoming Safety Alerts</h3><div id="responder-alerts"></div></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-route-records">
+      <div class="panel-header">
+        <div class="panel-title">Route Calculation Records</div>
+        <div class="panel-sub">Road-distance fare calculations available to authorized management accounts.</div>
+      </div>
+      <div class="management-content"><div id="route-records-content"></div></div>
+    </div>
+
+    <!-- ── FARE MATRIX ── -->
+    <div class="panel" id="panel-matrix">
+      <div class="panel-header">
+        <div class="panel-title">📋 Habal-Habal Fare Matrix</div>
+        <div class="panel-sub">Joint Resolution No.1 s. 2026 — Manolo Fortich, Bukidnon</div>
+      </div>
+      <div class="matrix-content">
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>Distance (km)</th>
+              <th>Regular Fare / Head</th>
+              <th>Discounted Fare (PWD, SP, Senior Citizen)</th>
+            </tr>
+          </thead>
+          <tbody id="matrix-tbody"></tbody>
+        </table>
+        <div class="matrix-note">
+          <strong>⚠️ Note:</strong> Discounted fare is 20% off the regular fare, applicable to Persons with Disability (PWD), Solo Parents (SP), and Senior Citizens. 
+          Always carry your valid ID when availing the discount. Fares for distances beyond 10 km are computed proportionally.
+        </div>
+        <div class="matrix-note" style="margin-top:12px; background:var(--red-dim); border-color:var(--red);">
+          <strong style="color:var(--red);">📢 Your Rights:</strong> If a driver demands a fare higher than this official matrix, you have the right to refuse and report them. Use the <em>Report Driver</em> section in this app.
+          Use the authorized MFRTA/LGU channels for official complaint submission.
+        </div>
+      </div>
+    </div>
+    <!-- ── LOGS ── -->
+    <div class="panel" id="panel-logs">
+      <div class="panel-header">
+        <div class="panel-title">🕐 Calculation History</div>
+        <div class="panel-sub">Records of your recent fare calculations</div>
+      </div>
+      <div class="logs-toolbar" style="padding-top:16px">
+        <span class="logs-count" id="logs-count">0 records</span>
+        <button class="btn btn-danger btn-sm" onclick="clearLogs()">🗑 Clear All</button>
+      </div>
+      <div class="logs-content" id="logs-list">
+        <div class="log-empty">
+          <div class="log-empty-icon">🛵</div>
+          No calculations yet.<br>Use the map to calculate a fare!
+        </div>
+      </div>
+    </div>
+
+    <!-- ── REPORT ── -->
+    <div class="panel" id="panel-report">
+      <div class="panel-header">
+        <div class="panel-title">⚠️ Incident / Complaint Report</div>
+        <div class="panel-sub">Document a transportation incident or complaint for administrative review</div>
+      </div>
+      <div class="report-content">
+        <div style="background:var(--red-dim);border:1px solid rgba(192,57,43,0.25);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:20px;font-size:13.5px;color:var(--red);line-height:1.6;">
+          🛑 <strong>Use this form for transportation or safety-related concerns. GeoFare records and manages reports; it does not provide emergency response.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Driver's Plate Number *</label>
+          <input class="form-input" id="rpt-plate" placeholder="e.g. MF-1234" style="text-transform:uppercase;letter-spacing:2px;font-weight:700;font-size:15px">
+          <div class="form-hint">Enter the motorcycle plate number as displayed on the vehicle.</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Date & Time of Incident *</label>
+          <input class="form-input" type="datetime-local" id="rpt-datetime">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Route (From → To) *</label>
+          <input class="form-input" id="rpt-route" placeholder="e.g. Manolo Fortich Poblacion → Dahilayan">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Fare Demanded (₱) *</label>
+          <input class="form-input" type="number" id="rpt-fare" placeholder="e.g. 150">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Type of Violation *</label>
+          <select class="form-select" id="rpt-type">
+            <option value="">— Select violation type —</option>
+            <option value="overcharging">Overcharging / Demanding higher fare than matrix</option>
+            <option value="refuse-discount">Refusing to honor PWD / Senior / SP discount</option>
+            <option value="rude-conduct">Rude or threatening conduct</option>
+            <option value="unsafe-driving">Unsafe or reckless driving</option>
+            <option value="other">Other violation</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Detailed Description *</label>
+          <textarea class="form-textarea" id="rpt-desc" placeholder="Describe what happened in detail. Include any verbal exchanges, demands, or threatening behavior."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Your Name (optional)</label>
+          <input class="form-input" id="rpt-name" placeholder="Anonymous by default">
+          <div class="form-hint">Your identity will be kept confidential.</div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="generateReport()" style="flex:1">📄 Generate Report Slip</button>
+          <button class="btn btn-secondary" onclick="clearReport()">Reset</button>
+        </div>
+
+        <!-- Preview -->
+        <div class="report-preview" id="report-preview">
+          <div class="rp-header">
+            <div class="rp-badge">Citizen Complaint Report</div>
+            <div class="rp-title">Habal-Habal Driver Complaint</div>
+            <div class="rp-sub">Manolo Fortich, Bukidnon • MFRTA-CADO</div>
+          </div>
+          <div id="rp-fields"></div>
+          <div class="rp-footer">
+            Reference No: <span class="rp-ref" id="rp-ref">—</span><br>
+            Generated via GeoFare Fare Calculator · manolofortich.gov.ph<br>
+           Submit to: <a href="mailto:mfrta@manolofortich.gov.ph">mfrta@manolofortich.gov.ph</a> or call 0917-159-5855<br>
+            <em>This document serves as a prima facie record of your complaint.</em>
+          </div>
+        </div>
+
+        <div id="report-actions" style="display:none; margin-top:12px; flex-wrap:wrap; gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="printReport()">🖨️ Print / Save as Image</button>
+          <button class="btn btn-secondary btn-sm" onclick="saveReportLog()">💾 Save to Records</button>
+        </div>
+
+        <!-- Saved Reports -->
+        <div id="saved-reports-section" style="margin-top:28px; display:none;">
+          <div class="about-section-title">📁 Saved Reports</div>
+          <div class="report-list" id="saved-reports-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ABOUT ── -->
+    <div class="panel" id="panel-about">
+      <div class="panel-header">
+        <div class="panel-title">ℹ️ About GeoFare</div>
+        <div class="panel-sub">Project scope, researchers, and technical basis</div>
+      </div>
+      <div class="about-content">
+        <div class="about-hero">
+          <div class="about-hero-tag">🛵 For the Riders of Manolo Fortich</div>
+          <div class="about-hero-title">Know Your Fare.<br>Know Your Rights.</div>
+          <div class="about-hero-sub">A role-aware GIS fare computation and management system for commuters, habal-habal riders, and authorized transportation management personnel.</div>
+        </div>
+ 
+        <div class="about-section">
+          <div class="about-section-title">🌱 Why this was made</div>
+          <p>With the implementation of the new Habal-Habal Flexible Fare Matrix under Joint Resolution No.1 s. 2026, many passengers — especially the elderly and those unfamiliar with technology — are unaware of the official fares. This leads to confusion, and sometimes overcharging.</p>
+          <p>GeoFare was built to put the official fare matrix in everyone's pocket, with an easy map-based calculator so anyone can know exactly how much their ride should cost before they even mount the motorcycle.</p>
+          <p>GeoFare does not provide ride booking, payments, live tracking, or emergency dispatch.</p>
+        </div>
+ 
+        <div class="about-section">
+          <div class="about-section-title">👤 Built by</div>
+          <div class="about-card">
+            <div class="about-avatar">🎓</div>
+            <div>
+              <div class="about-name">GeoFare Research Team</div>
+              <div class="about-role">
+                <strong>Auggie John Fred G. Manginsay</strong><br>
+                <strong>Rian S. Cat-awan</strong><br>
+                <strong>Weniel A. Raña</strong><br>
+                <strong>Northern Bukidnon State College</strong><br>
+                Manolo Fortich, Bukidnon
+              </div>
+            </div>
+          </div>
+        </div>
+ 
+        <div class="about-section">
+          <div class="about-section-title">📜 Legal Basis</div>
+          <div class="fare-ref-box">
+            <strong>Joint Resolution No.1 s. 2026</strong><br>
+            Sangguniang Bayan – Habal-Habal Associations – MFRTA-CADO<br>
+            Municipality of Manolo Fortich, Province of Bukidnon<br><br>
+            Fare and regulatory information should be verified against the current authorized LGU/MFRTA record.
+          </div>
+        </div>
+ 
+        <div class="about-section">
+          <div class="about-section-title">⚙️ How it works</div>
+          <p>The map uses OpenStreetMap data. When you drop a pickup and drop-off pin, the app calculates the actual road distance between both points using OSRM (Open Source Routing Machine) — the same road network your habal-habal driver follows — and references the official fare table to compute your fare instantly.</p>
+          <p>When Supabase is configured, authenticated records are stored in the application database. Development mode uses an isolated local mock data provider. The Report feature generates a printable slip you can use when filing a complaint with the LGU or MFRTA.</p>
+        </div>
+ 
+        <div class="about-section">
+          <div class="about-section-title">✉️ Contact the Developer</div>
+          <div class="about-card" style="background:var(--accent-dim); border-color:var(--accent); border-width:1.5px;">
+            <div class="about-avatar" style="background:var(--accent); font-size:20px;">💬</div>
+            <div>
+              <div class="about-name" style="font-size:15px;">GeoFare Research Team</div>
+              <div class="about-role" style="margin-top:6px; line-height:1.8;">
+                For project feedback, bug reports, or collaboration:<br>
+                <a href="mailto:auggiejohnfred504@gmail.com" style="color:var(--accent); font-weight:600; font-size:13px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; margin-top:4px;">
+                  📧 auggiejohnfred504@gmail.com
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+ 
+        <div class="about-section">
+          <div class="about-section-title" style="color:var(--text3)">Version</div>
+          <p style="font-size:12.5px; color:var(--text3);">GeoFare v1.0 · Open source · Hosted on GitHub + Vercel</p>
+        </div>
+      </div>
+    </div>
+ 
+  
+<!-- RIDER VERIFICATION -->
+<div class="panel" id="panel-riders">
+  <div class="panel-header">
+    <div class="panel-title">Verified Habal-Habal Riders</div>
+    <div class="panel-sub">Search registered riders and review public verification information.</div>
+  </div>
+  <div class="management-content">
+    <div class="toolbar-row">
+      <input class="form-input" id="rider-search" placeholder="Search rider name or public ID">
+      <button class="btn btn-primary btn-sm" id="rider-search-btn">Search</button>
+    </div>
+    <div id="rider-results" class="card-grid"></div>
+  </div>
+</div>
+
+<!-- RATINGS -->
+<div class="panel" id="panel-ratings">
+  <div class="panel-header">
+    <div class="panel-title">Rider Ratings</div>
+    <div class="panel-sub">Professionalism, safety, punctuality, and service quality.</div>
+  </div>
+  <div class="management-content">
+    <div class="info-banner">Ratings are feedback records for accountability. They are not a guarantee of physical safety.</div>
+    <div id="ratings-content"></div>
+    <form id="rating-form" class="form-card">
+      <h3>Submit Rider Feedback</h3>
+      <div class="form-group"><label class="form-label" for="rating-rider">Verified Rider</label><select class="form-select" id="rating-rider" required></select></div>
+      <div class="rating-grid">
+        <label>Professionalism<input type="number" min="1" max="5" id="rate-prof" required></label>
+        <label>Safety<input type="number" min="1" max="5" id="rate-safe" required></label>
+        <label>Punctuality<input type="number" min="1" max="5" id="rate-punct" required></label>
+        <label>Service Quality<input type="number" min="1" max="5" id="rate-service" required></label>
+      </div>
+      <div class="form-group"><label class="form-label" for="rate-comment">Comment (optional)</label><textarea class="form-textarea" id="rate-comment" maxlength="500"></textarea></div>
+      <button class="btn btn-primary" type="submit">Submit Rating</button>
+    </form>
+  </div>
+</div>
+
+<!-- MY REPORTS / ADMIN REPORTS -->
+<div class="panel" id="panel-reports">
+  <div class="panel-header">
+    <div class="panel-title" id="reports-title">Incident & Complaint Reports</div>
+    <div class="panel-sub">Records submitted for administrative review. This module does not provide emergency response.</div>
+  </div>
+  <div class="management-content">
+    <div class="toolbar-row">
+      <select class="form-select" id="report-filter"><option value="all">All statuses</option><option>New</option><option>Under Review</option><option>Resolved</option><option>Dismissed</option></select>
+      <button class="btn btn-secondary btn-sm" id="refresh-reports">Refresh</button>
+    </div>
+    <div id="reports-content"></div>
+  </div>
+</div>
+
+<!-- ADMIN DASHBOARD -->
+<div class="panel" id="panel-admin">
+  <div class="panel-header">
+    <div class="panel-title">Administrator / MFRTA Dashboard</div>
+    <div class="panel-sub">Management, verification, fare policy, reports, and accountability.</div>
+  </div>
+  <div class="management-content">
+    <div class="stats-grid" id="admin-stats"></div>
+    <div class="admin-grid">
+      <section class="form-card"><h3>Pending Rider Verification</h3><div id="pending-riders"></div></section>
+      <section class="form-card"><h3>Recent Administrative Activity</h3><div id="audit-preview"></div></section>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN FARE MANAGEMENT -->
+<div class="panel" id="panel-fare-admin">
+  <div class="panel-header">
+    <div class="panel-title">Fare Matrix Management</div>
+    <div class="panel-sub">Versioned fare data. Values are not silently overwritten.</div>
+  </div>
+  <div class="management-content">
+    <div class="info-banner">Only authorized Administrator / MFRTA accounts may change the active fare matrix. The supplied prototype contains development values that must be verified against the official LGU record before production use.</div>
+    <form id="fare-admin-form" class="form-card">
+      <div class="toolbar-row"><input class="form-input" type="number" min="1" id="fare-km" placeholder="Distance km"><input class="form-input" type="number" min="0" step="0.01" id="fare-regular" placeholder="Regular fare"><input class="form-input" type="number" min="0" step="0.01" id="fare-discount" placeholder="Discounted fare"><button class="btn btn-primary" type="submit">Add / Update Row</button></div>
+    </form>
+    <div id="fare-admin-table"></div>
+  </div>
+</div>
+
+<!-- ADMIN BARANGAY MANAGEMENT -->
+<div class="panel" id="panel-barangays">
+  <div class="panel-header"><div class="panel-title">Barangay Data Management</div><div class="panel-sub">Maintain barangay reference data used by management and route/fare records.</div></div>
+  <div class="management-content">
+    <div class="info-banner">Only authorized Administrator / MFRTA accounts can manage barangay reference data. Database deployments should expose a <b>barangays</b> table with appropriate Row Level Security.</div>
+    <form id="barangay-form" class="form-card" style="margin-bottom:16px">
+      <input type="hidden" id="barangay-id">
+      <div class="toolbar-row">
+        <input class="form-input" id="barangay-name" placeholder="Barangay name" required maxlength="120">
+        <input class="form-input" id="barangay-code" placeholder="Code / identifier" maxlength="30">
+        <select class="form-select" id="barangay-status"><option>Active</option><option>Inactive</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Description / service area notes</label><textarea class="form-textarea" id="barangay-description" maxlength="500" placeholder="Reference information for management use."></textarea></div>
+      <div class="table-actions"><button class="btn btn-primary" type="submit">Save Barangay</button><button class="btn btn-secondary" type="button" id="barangay-reset">Reset</button></div>
+    </form>
+    <div id="barangays-content"></div>
+  </div>
+</div>
+
+<!-- ADMIN USERS -->
+<div class="panel" id="panel-users">
+  <div class="panel-header">
+    <div class="panel-title">User Management</div>
+    <div class="panel-sub">Manage account status and role records. Passwords are never displayed.</div>
+  </div>
+  <div class="management-content"><div id="users-content"></div></div>
+</div>
+
+<!-- ADMIN AUDIT -->
+<div class="panel" id="panel-audit">
+  <div class="panel-header">
+    <div class="panel-title">Activity / Audit Logs</div>
+    <div class="panel-sub">Administrative actions are recorded for accountability.</div>
+  </div>
+  <div class="management-content"><div id="audit-content"></div></div>
+</div>
+
+<!-- PROFILE -->
+<div class="panel" id="panel-profile">
+  <div class="panel-header"><div class="panel-title">My Profile</div><div class="panel-sub">Role-aware account information.</div></div>
+  <div class="management-content"><div id="profile-content"></div></div>
+</div>
+
+</main>
+</div>
+
+<div class="loading-overlay" id="loading-overlay"><div class="loading-card"><span id="loading-message">Working…</span></div></div>
+<div class="toast-wrap" id="toast-wrap"></div>
+
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+'use strict';
+
+/* GeoFare configuration.
+ * This single-file build uses the Supabase project credentials already present
+ * in the supplied sign-in/sign-up implementation. The publishable/anon key is
+ * intended for browser use; never place a Supabase service-role key here.
+ * For a different deployment, replace only SUPABASE_URL and SUPABASE_ANON_KEY.
+ */
+const GEOFARE_CONFIG = {
+  SUPABASE_URL: window.GEOFARE_SUPABASE_URL || 'https://ydizkrfjxkzxfxtelncb.supabase.co',
+  SUPABASE_ANON_KEY: window.GEOFARE_SUPABASE_ANON_KEY || 'sb_publishable_PHZeB_415FLZn3pIj0sv_A_c40Zeb07',
+  ROUTING_URL: 'https://router.project-osrm.org/route/v1/driving',
+  ROUTING_FALLBACK_URL: 'https://routing.openstreetmap.de/routed-car/route/v1/driving',
+  NOMINATIM_URL: 'https://nominatim.openstreetmap.org'
+};
+
+const HAS_SUPABASE = Boolean(GEOFARE_CONFIG.SUPABASE_URL && GEOFARE_CONFIG.SUPABASE_ANON_KEY);
+const supabaseClient = HAS_SUPABASE ? window.supabase.createClient(GEOFARE_CONFIG.SUPABASE_URL, GEOFARE_CONFIG.SUPABASE_ANON_KEY) : null;
+
+/* A single, always-available Administrator/MFRTA account. Signing in with these
+ * exact credentials logs straight into the full-CRUD admin dashboard using the
+ * local data provider, regardless of whether Supabase is configured — so admin
+ * access never depends on a database being reachable or an auth row existing. */
+const SUPERADMIN_EMAIL = 'mfrta@manolofortich.gov.ph';
+const SUPERADMIN_PASSWORD = 'admin_mfrta';
+let ADMIN_LOCAL_OVERRIDE = false;
+function usingSupabase(){ return HAS_SUPABASE && !ADMIN_LOCAL_OVERRIDE; }
+function statusClass(status){ return 'status-'+String(status||'active').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/(^-+|-+$)/g,''); }
+const STORAGE = {
+  session: 'geofare.mock.session',
+  profiles: 'geofare.mock.profiles',
+  riders: 'geofare.mock.riders',
+  verifications: 'geofare.mock.verifications',
+  fares: 'geofare.mock.fares',
+  calculations: 'geofare.mock.calculations',
+  reports: 'geofare.mock.reports',
+  ratings: 'geofare.mock.ratings',
+  audit: 'geofare.mock.audit',
+  users: 'geofare.mock.users',
+  safety: 'geofare.mock.safety',
+  responders: 'geofare.mock.responders',
+  barangays: 'geofare.mock.barangays'
+};
+
+
+const SUPPLIED_DEVELOPMENT_FARES = [
+  {km:1, regular:20, discount:16}, {km:2, regular:25, discount:20},
+  {km:3, regular:30, discount:24}, {km:4, regular:40, discount:32},
+  {km:5, regular:45, discount:36}, {km:6, regular:50, discount:40},
+  {km:7, regular:60, discount:48}, {km:8, regular:65, discount:52},
+  {km:9, regular:70, discount:56}, {km:10, regular:75, discount:60}
+];
+
+let safetyChannel = null;
+
+const state = {
+  user: null,
+  role: null,
+  profile: null,
+  currentPanel: 'map',
+  currentMode: 'pickup',
+  pickupMarker: null,
+  dropoffMarker: null,
+  routeLine: null,
+  lastCalculation: null,
+  calculating: false,
+  fareMatrix: [],
+  reports: [],
+  ratings: [],
+  riders: [],
+  users: [],
+  audit: [],
+  safetyAlerts: [],
+  calculations: [],
+  barangays: []
+};
+
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const money = n => Number(n).toLocaleString('en-PH',{style:'currency',currency:'PHP',minimumFractionDigits:2});
+const nowPH = () => new Date().toLocaleString('en-PH',{dateStyle:'medium',timeStyle:'short'});
+
+function toast(msg,type='info'){
+  const wrap=$('toast-wrap'); const t=document.createElement('div');
+  t.className='toast '+type; t.textContent=msg; wrap.appendChild(t);
+  setTimeout(()=>t.remove(),3200);
+}
+function setBusy(active,message='Working…'){ $('loading-overlay')?.classList.toggle('active',active); if($('loading-message')) $('loading-message').textContent=message; }
+function authMessage(msg,type='error'){ const el=$('auth-alert'); el.textContent=msg; el.className='auth-alert show '+type; }
+function clearAuthMessage(){ $('auth-alert').className='auth-alert'; $('auth-alert').textContent=''; }
+
+function read(key,fallback=[]){ try{return JSON.parse(localStorage.getItem(key)||JSON.stringify(fallback));}catch{return fallback;} }
+function write(key,value){ localStorage.setItem(key,JSON.stringify(value)); }
+
+function mockSeed(){
+  if(!localStorage.getItem(STORAGE.fares)) write(STORAGE.fares,SUPPLIED_DEVELOPMENT_FARES.map(x=>({...x,version:'DEV-SUPPLIED-2026',status:'development',effective_from:null})));
+  if(!localStorage.getItem(STORAGE.profiles)) write(STORAGE.profiles,[]);
+  if(!localStorage.getItem(STORAGE.riders)) write(STORAGE.riders,[]);
+  if(!localStorage.getItem(STORAGE.verifications)) write(STORAGE.verifications,[]);
+  if(!localStorage.getItem(STORAGE.calculations)) write(STORAGE.calculations,[]);
+  if(!localStorage.getItem(STORAGE.reports)) write(STORAGE.reports,[]);
+  if(!localStorage.getItem(STORAGE.ratings)) write(STORAGE.ratings,[]);
+  if(!localStorage.getItem(STORAGE.audit)) write(STORAGE.audit,[]);
+  if(!localStorage.getItem(STORAGE.users)) write(STORAGE.users,[]);
+   if(!localStorage.getItem(STORAGE.safety)) write(STORAGE.safety,[]);
+   if(!localStorage.getItem(STORAGE.barangays)) write(STORAGE.barangays,[]);
+}
+mockSeed();
+
+function roleLabel(role){ return role==='admin'?'Administrator / MFRTA':role==='rider'?'Habal-Habal Rider':role==='responder'?'Authorized Responder':'Commuter'; }
+
+function navForRole(role){
+  if(role==='commuter') return [
+    ['commuter-dashboard','⌂','Commuter Dashboard'],
+    ['map','🗺️','Fare Calculator'],
+    ['matrix','📋','Fare Matrix'],
+    ['riders','✓','Verified Riders'],
+    ['ratings','★','Ratings / Reviews'],
+    ['safety','🆘','Safety & SOS'],
+    ['reports','⚠','My Reports'],
+    ['logs','🕐','Fare History'],
+    ['profile','◯','Profile'],
+    ['about','ℹ','About']
+  ];
+  if(role==='rider') return [
+    ['rider-dashboard','⌂','Rider Dashboard'],
+    ['map','🗺️','Fare Calculator'],
+    ['matrix','📋','Fare Matrix'],
+    ['riders','✓','Rider Verification'],
+    ['ratings','★','My Ratings'],
+    ['safety','🆘','Safety Alerts'],
+    ['reports','⚠','Reports / Concerns'],
+    ['logs','🕐','Fare History'],
+    ['profile','◯','Rider Profile'],
+    ['about','ℹ','About']
+  ];
+  if(role==='responder') return [
+    ['responder','🆘','Responder Dashboard'],
+    ['safety','⚠','Safety Alerts'],
+    ['profile','◯','Profile'],
+    ['about','ℹ','About']
+  ];
+  return [
+    ['admin','▦','MFRTA Dashboard'],
+    ['map','🗺️','Fare Calculator'],
+    ['matrix','📋','Fare Matrix View'],
+    ['fare-admin','⚙','Fare Matrix Management'],
+    ['riders','✓','Rider Verification'],
+    ['reports','⚠','Incident Management'],
+    ['safety','🆘','Safety Alert Management'],
+    ['route-records','🗺️','Route Calculation Records'],
+    ['ratings','★','Ratings Monitoring'],
+    ['users','◉','User Management'],
+    ['audit','⌁','Activity / Audit Logs'],
+    ['profile','◯','Profile'],
+    ['about','ℹ','About']
+  ];
+}
+
+function renderNav(){
+  const nav=$('role-nav'); nav.innerHTML='';
+  navForRole(state.role).forEach(([id,icon,label],idx)=>{
+    if(idx===2 && state.role!=='admin'){ const d=document.createElement('div'); d.className='section-divider'; nav.appendChild(d); }
+    const b=document.createElement('button'); b.className='nav-link '+(state.currentPanel===id?'active':'');
+    b.id='nav-'+id; b.type='button'; b.title=label; b.innerHTML=`<span class="nav-icon">${icon}</span><span class="nav-label">${esc(label)}</span>`;
+    if(id==='logs') b.innerHTML += '<span class="nav-badge" id="log-badge" style="display:none">0</span>';
+    b.onclick=()=>showPanel(id); nav.appendChild(b);
+  });
+}
+
+function showPanel(panel){
+  const allowed=navForRole(state.role).map(x=>x[0]); if(!allowed.includes(panel)) panel=state.role==='admin'?'admin':'map';
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  const target=$('panel-'+panel); if(target) target.classList.add('active');
+  state.currentPanel=panel; renderNav();
+  if(panel==='commuter-dashboard') renderCommuterDashboard();
+  if(panel==='rider-dashboard') renderRiderDashboard();
+  if(panel==='matrix') renderMatrix();
+  if(panel==='logs') renderLogs();
+  if(panel==='riders') renderRiders();
+  if(panel==='ratings') renderRatings();
+  if(panel==='reports') renderReports();
+  if(panel==='admin') renderAdmin();
+  if(panel==='fare-admin') renderFareAdmin();
+  if(panel==='barangays') renderBarangays();
+  if(panel==='users') renderUsers();
+  if(panel==='audit') renderAudit();
+  if(panel==='safety') renderSafety();
+  if(panel==='responder') renderResponder();
+  if(panel==='route-records') renderRouteRecords();
+  if(panel==='profile') renderProfile();
+  if(panel==='about') renderAbout?.();
+  if(panel==='map') setTimeout(()=>map.invalidateSize(),150);
+  if(window.innerWidth<=768) closeSidebar();
+}
+
+function toggleSidebar(){ $('sidebar').classList.toggle('active'); $('overlay').classList.toggle('active'); }
+function closeSidebar(){ $('sidebar').classList.remove('active'); $('overlay').classList.remove('active'); }
+
+function updateRoleHeader(){
+  $('role-heading').textContent=roleLabel(state.role);
+  $('mode-badge').textContent=ADMIN_LOCAL_OVERRIDE?'ADMINISTRATOR (LOCAL SESSION)':usingSupabase()?'DATABASE CONNECTED':'LOCAL DEVELOPMENT';
+  $('nav-footer').innerHTML=`GeoFare · ${esc(roleLabel(state.role))}<br>Manolo Fortich, Bukidnon<br><span style="color:var(--accent);font-weight:600">Northern Bukidnon State College</span>`;
+}
+
+
+function stopSafetyRealtime(){
+  if(safetyChannel&&usingSupabase()){
+    try{supabaseClient.removeChannel(safetyChannel);}catch(_){}
+  }
+  safetyChannel=null;
+}
+function startSafetyRealtime(){
+  if(!usingSupabase()||!state.user)return;
+  stopSafetyRealtime();
+  const config={event:'*',schema:'public',table:'safety_alerts'};
+  if(state.role==='commuter')config.filter=`user_id=eq.${state.user.id}`;
+  if(state.role==='rider'){
+    const rider=getCurrentRider();
+    config.filter=rider?.id?`rider_id=eq.${rider.id}`:`user_id=eq.${state.user.id}`;
+  }
+  // Admin and responder receive the authorized management stream.
+  safetyChannel=supabaseClient.channel(`geofare-safety-${state.user.id}`)
+    .on('postgres_changes',config,async()=>{
+      await loadData();
+      if(state.currentPanel==='safety')renderSafety();
+      if(state.currentPanel==='responder')renderResponder();
+      if(state.currentPanel==='admin')renderAdmin();
+      if(state.currentPanel==='commuter-dashboard')renderCommuterDashboard();
+      if(state.currentPanel==='rider-dashboard')renderRiderDashboard();
+    })
+    .subscribe(status=>console.debug('GeoFare safety realtime:',status));
+}
+function setupAuthUI(){
+  $('auth-switch').onclick=()=>{
+    const login=$('login-form'), signup=$('signup-form'), isLogin=login.style.display!=='none';
+    login.style.display=isLogin?'none':'block'; signup.style.display=isLogin?'block':'none';
+    $('auth-title').textContent=isLogin?'Create your GeoFare account':'Sign in to GeoFare';
+    $('auth-switch-text').textContent=isLogin?'Already have an account?':'Need an account?';
+    $('auth-switch').textContent=isLogin?'Sign in':'Sign up'; clearAuthMessage();
+  };
+  $('signup-role').onchange=()=>{$('rider-fields').style.display=$('signup-role').value==='rider'?'block':'none';};
+  $('login-form').onsubmit=handleLogin;
+  $('signup-form').onsubmit=handleSignup;
+  $('logout-btn').onclick=logout;
+  $('profile-btn').onclick=()=>showPanel('profile');
+  const demoLine = HAS_SUPABASE ? 'Connected mode: authentication and records use Supabase. Public sign-up is limited to Commuter and Habal-Habal Rider; Responder accounts should be provisioned by authorized management.' :
+    '<strong>Development mode.</strong> No Supabase credentials are configured. You can test role flows locally with demo accounts: <b>commuter@demo.local</b>, <b>rider@demo.local</b>, <b>responder@demo.local</b>. Password: <b>GeoFareDemo!2026</b>. These accounts are local development fixtures only.';
+  $('demo-note').innerHTML = demoLine + '<br><br><strong>Administrator / MFRTA:</strong> sign in with <b>'+SUPERADMIN_EMAIL+'</b> and the official MFRTA password to open the full-CRUD management dashboard directly — this works even without a database connection.';
+}
+
+function mockLogin(email,password){
+  if(password!=='GeoFareDemo!2026') throw new Error('Invalid email or password.');
+  const role=email.startsWith('admin@')?'admin':email.startsWith('rider@')?'rider':email.startsWith('responder@')?'responder':'commuter';
+  const names={admin:'MFRTA Administrator',rider:'Development Rider',responder:'Development Responder',commuter:'Development Commuter'};
+  return {id:'demo-'+role,email,name:names[role],role};
+}
+async function handleLogin(e){
+  e.preventDefault(); clearAuthMessage(); setBusy(true,'Signing in…');
+  try{
+    const email=$('login-email').value.trim().toLowerCase(), password=$('login-password').value;
+    if(!email || !password) throw new Error('Email and password are required.');
+    if(email===SUPERADMIN_EMAIL && password===SUPERADMIN_PASSWORD){
+      ADMIN_LOCAL_OVERRIDE=true;
+      const profile={id:'superadmin-mfrta',email:SUPERADMIN_EMAIL,full_name:'MFRTA Administrator',role:'admin',status:'active',contact_number:'0917-159-5855',address:'MFRTA-CADO, Manolo Fortich, Bukidnon'};
+      state.user={id:profile.id,email:profile.email,name:profile.full_name,role:'admin',__localOverride:true};
+      state.role='admin'; state.profile=profile;
+      write(STORAGE.session,state.user);
+      await enterApplication();
+      return;
+    }
+    if(HAS_SUPABASE){
+      const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+      if(error) throw new Error('Invalid email or password.');
+      await establishSupabaseSession(data.session);
+    }else{
+      state.user=mockLogin(email,password); state.role=state.user.role; state.profile={id:state.user.id,email:state.user.email,full_name:state.user.name,role:state.user.role,status:'active'};
+      write(STORAGE.session,state.user);
+      await enterApplication();
+    }
+  }catch(err){authMessage(err.message||'Unable to sign in.');}
+  finally{setBusy(false);}
+}
+async function ensureSupabaseProfile(user, fallback = {}){
+  if(!HAS_SUPABASE || !user?.id) return null;
+  const meta = user.user_metadata || {};
+  const role = ['commuter','rider','admin','responder'].includes(fallback.role || meta.role) ? (fallback.role || meta.role) : 'commuter';
+  const profile = {
+    id: user.id,
+    email: user.email || fallback.email || '',
+    full_name: fallback.full_name || meta.full_name || user.email?.split('@')[0] || 'GeoFare User',
+    role,
+    contact_number: fallback.contact_number ?? meta.contact_number ?? '',
+    address: fallback.address ?? meta.address ?? '',
+    status: fallback.status || 'active'
+  };
+  const {data,error}=await supabaseClient.from('profiles').upsert(profile,{onConflict:'id'}).select('*').single();
+  if(error){
+    console.warn('GeoFare profile sync:',error.message);
+    return profile;
+  }
+  return data || profile;
+}
+
+async function ensureSupabaseRiderProfile(user, signupData={}){
+  if(!HAS_SUPABASE || !user?.id || signupData.role!=='rider') return null;
+  const publicId = signupData.public_id || ('RDR-'+Math.random().toString(36).slice(2,8).toUpperCase());
+  const rider = {
+    profile_id:user.id,
+    public_id:publicId,
+    business_permit_reference:signupData.business_permit_reference || '',
+    service_area:signupData.service_area || '',
+    verification_status:'Pending',
+    average_rating:null
+  };
+  const {data,error}=await supabaseClient.from('rider_profiles').upsert(rider,{onConflict:'profile_id'}).select('*').single();
+  if(error){
+    console.warn('GeoFare rider profile sync:',error.message);
+    return null;
+  }
+  // Keep the verification trail in sync when the optional table exists.
+  const verification={rider_id:data.profile_id||user.id,status:'Pending',submitted_at:new Date().toISOString(),note:null};
+  const vr=await supabaseClient.from('rider_verifications').insert(verification);
+  if(vr.error && !/duplicate|unique/i.test(vr.error.message||'')) console.warn('GeoFare rider verification sync:',vr.error.message);
+  return data;
+}
+
+async function handleSignup(e){
+  e.preventDefault(); clearAuthMessage(); setBusy(true,'Creating account…');
+  try{
+    const name=$('signup-name').value.trim(),email=$('signup-email').value.trim().toLowerCase(),password=$('signup-password').value,confirm=$('signup-confirm').value;
+    const role=$('signup-role').value;
+    const contact=$('signup-contact').value.trim(), address=$('signup-address').value.trim();
+    const permit=role==='rider' ? $('signup-permit').value.trim() : '';
+    const serviceArea=role==='rider' ? $('signup-service-area').value.trim() : '';
+    if(!name || !email) throw new Error('Full name and email are required.');
+    if(password!==confirm) throw new Error('Passwords do not match.');
+    if(password.length<8) throw new Error('Password must be at least 8 characters.');
+    if(role==='rider' && !permit) throw new Error('Rider accounts require a business permit / verification reference for review.');
+    if(HAS_SUPABASE){
+      const payload={full_name:name,role:role==='rider'?'rider':'commuter',contact_number:contact,address,business_permit_reference:permit||null,service_area:serviceArea||null};
+      const {data,error}=await supabaseClient.auth.signUp({email,password,options:{data:payload}});
+      if(error) throw error;
+      if(!data?.user) throw new Error('Supabase did not return the new account. Please try again.');
+
+      // If email confirmation is disabled, create/sync all application rows immediately.
+      if(data.session){
+        const profile=await ensureSupabaseProfile(data.user,{...payload,email});
+        if(role==='rider') await ensureSupabaseRiderProfile(data.user,{...payload,role});
+        state.profile=profile;
+        authMessage('Account created successfully. Opening your GeoFare dashboard…','success');
+        await establishSupabaseSession(data.session);
+      }else{
+        // The Auth user exists even when confirmation is required. The database trigger should
+        // create the profiles row from raw_user_meta_data; the next confirmed session also
+        // runs ensureSupabaseProfile() to repair/sync the row if necessary.
+        authMessage('Account created successfully. Check your email to confirm your account. After confirmation, sign in with the same email and password.','success');
+        $('signup-form').reset(); $('rider-fields').style.display='none';
+      }
+    }else{
+      const profiles=read(STORAGE.profiles,[]);
+      if(profiles.some(p=>p.email===email)) throw new Error('An account with this email already exists.');
+      const id='mock-'+Date.now().toString(36);
+      const profile={id,email,full_name:name,role,contact_number:contact,address,status:'active'};
+      profiles.push(profile); write(STORAGE.profiles,profiles);
+      const users=read(STORAGE.users,[]); users.push({...profile,created_at:new Date().toISOString()}); write(STORAGE.users,users);
+      if(role==='rider'){
+        const riders=read(STORAGE.riders,[]); riders.push({id,profile_id:id,public_id:'RDR-'+Math.random().toString(36).slice(2,8).toUpperCase(),business_permit_reference:permit,service_area:serviceArea,verification_status:'Pending',average_rating:null}); write(STORAGE.riders,riders);
+        const ver=read(STORAGE.verifications,[]); ver.push({id:'ver-'+Date.now(),rider_id:id,status:'Pending',submitted_at:new Date().toISOString(),note:null}); write(STORAGE.verifications,ver);
+      }
+      state.user={id,email,name,role}; state.role=role; state.profile=profile; write(STORAGE.session,state.user); await enterApplication();
+    }
+  }catch(err){authMessage(err.message||'Unable to create account.');}
+  finally{setBusy(false);}
+}
+async function establishSupabaseSession(session){
+  if(!session?.user) throw new Error('No authenticated session returned.');
+  state.user=session.user;
+  const meta=session.user.user_metadata||{};
+  let profile=null;
+  const lookup=await supabaseClient.from('profiles').select('*').eq('id',session.user.id).maybeSingle();
+  if(lookup.error) console.warn('Profile lookup:',lookup.error.message);
+  profile=lookup.data||null;
+  // Always repair missing/stale profile data on a valid authenticated session.
+  profile=await ensureSupabaseProfile(session.user,profile||{
+    email:session.user.email,
+    full_name:meta.full_name,
+    role:meta.role,
+    contact_number:meta.contact_number,
+    address:meta.address,
+    status:'active'
+  });
+  if(!profile) throw new Error('Your account is authenticated, but its GeoFare profile could not be synchronized. Please contact the administrator.');
+  state.profile=profile;
+  state.role=['commuter','rider','admin','responder'].includes(profile.role)?profile.role:'commuter';
+  if(state.role==='rider'){
+    const permit=meta.business_permit_reference||'';
+    const serviceArea=meta.service_area||'';
+    const riderLookup=await supabaseClient.from('rider_profiles').select('*').eq('profile_id',session.user.id).maybeSingle();
+    if(riderLookup.error) console.warn('Rider profile lookup:',riderLookup.error.message);
+    if(!riderLookup.data && permit) await ensureSupabaseRiderProfile(session.user,{role:'rider',business_permit_reference:permit,service_area:serviceArea});
+  }
+  await enterApplication();
+}
+async function restoreSession(){
+  const localSession=read(STORAGE.session,null);
+  if(localSession && localSession.__localOverride){
+    ADMIN_LOCAL_OVERRIDE=true;
+    state.user=localSession; state.role='admin';
+    state.profile={id:'superadmin-mfrta',email:SUPERADMIN_EMAIL,full_name:'MFRTA Administrator',role:'admin',status:'active',contact_number:'0917-159-5855',address:'MFRTA-CADO, Manolo Fortich, Bukidnon'};
+    await enterApplication();
+    return;
+  }
+  if(usingSupabase()){
+    const {data}=await supabaseClient.auth.getSession();
+    if(data.session){ try{await establishSupabaseSession(data.session);return;}catch(e){console.warn(e);} }
+  }else{
+    const s=localSession;
+    if(s){state.user=s;state.role=s.role;state.profile=read(STORAGE.profiles,[]).find(p=>p.id===s.id)||{id:s.id,email:s.email,full_name:s.name,role:s.role,status:'active'};await enterApplication();return;}
+  }
+  $('auth-screen').classList.remove('hidden');
+}
+async function enterApplication(){
+  $('auth-screen').classList.add('hidden'); $('app').style.display='flex'; updateRoleHeader(); renderNav();
+  await loadData(); startSafetyRealtime(); showPanel(state.role==='admin'?'admin':state.role==='rider'?'rider-dashboard':state.role==='responder'?'responder':'map');
+}
+async function logout(){
+  setBusy(true,'Signing out…');
+  try{
+    stopSafetyRealtime();
+    if(usingSupabase()) await supabaseClient.auth.signOut();
+    localStorage.removeItem(STORAGE.session);
+  }
+  finally{
+    ADMIN_LOCAL_OVERRIDE=false;
+    state.user=null;state.role=null;state.profile=null;state.currentPanel='map';
+    $('app').style.display='none'; $('auth-screen').classList.remove('hidden');
+    $('login-form').reset();
+    setBusy(false); toast('Signed out.','info');
+  }
+}
+
+async function loadData(){
+  if(usingSupabase()){
+    const results = await Promise.all([
+      supabaseClient.from('fare_matrix_versions').select('*').eq('status','active').order('effective_from',{ascending:false}),
+      supabaseClient.from('rider_profiles').select('*'),
+      supabaseClient.from('ratings').select('*').order('created_at',{ascending:false}),
+      supabaseClient.from('incidents').select('*').order('created_at',{ascending:false}),
+      state.role==='admin'
+        ? supabaseClient.from('fare_calculations').select('*').order('timestamp',{ascending:false}).limit(200)
+        : supabaseClient.from('fare_calculations').select('*').eq('user_id',state.user.id).order('timestamp',{ascending:false}).limit(100),
+      state.role==='admin'||state.role==='responder'||state.role==='rider'
+        ? supabaseClient.from('safety_alerts').select('*').order('created_at',{ascending:false}).limit(100)
+        : supabaseClient.from('safety_alerts').select('*').eq('user_id',state.user.id).order('created_at',{ascending:false}).limit(50),
+      supabaseClient.from('profiles').select('id,full_name,email,role,status,created_at'),
+      state.role==='admin' ? supabaseClient.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(100) : Promise.resolve({data:[],error:null}),
+      state.role==='admin' ? supabaseClient.from('barangays').select('*').order('name',{ascending:true}) : Promise.resolve({data:[],error:null})
+    ]);
+    const [fares,riders,ratings,reports,calculations,safety,profiles,audit,barangays]=results;
+    if(fares.error) throw new Error('Unable to load the active fare matrix.');
+    state.fareMatrix=fares.data||[];
+    state.riders=(riders.error?[]:riders.data)||[];
+    state.ratings=(ratings.error?[]:ratings.data)||[];
+    state.reports=(reports.error?[]:reports.data)||[];
+    state.calculations=(calculations.error?[]:calculations.data)||[];
+    state.safetyAlerts=(safety.error?[]:safety.data)||[];
+    state.users=(profiles?.error?[]:profiles?.data)||[];
+    const profileMap=new Map(state.users.map(p=>[p.id,p]));
+    state.riders=state.riders.map(r=>({...r,profile:profileMap.get(r.profile_id)||r.profile||{}}));
+    state.audit=(audit?.error?[]:audit?.data)||[];
+    state.barangays=(barangays?.error?[]:barangays?.data)||[];
+  }else{
+    state.fareMatrix=read(STORAGE.fares,[]);
+    state.riders=read(STORAGE.riders,[]).map(r=>({...r,profile:read(STORAGE.profiles,[]).find(p=>p.id===r.profile_id)||{}}));
+    state.ratings=read(STORAGE.ratings,[]);
+    state.reports=read(STORAGE.reports,[]);
+    state.calculations=read(STORAGE.calculations,[]).filter(x=>state.role==='admin'||x.user_id===state.user.id);
+    state.safetyAlerts=read(STORAGE.safety,[]);
+    state.users=read(STORAGE.users,[]);
+    state.audit=read(STORAGE.audit,[]);
+    state.barangays=read(STORAGE.barangays,[]);
+  }
+}
+
+function activeFareRows(){
+  let rows=(state.fareMatrix||[]).filter(f=>{
+    const status=String(f.status??'active').toLowerCase();
+    return status==='active'||status==='development'||!f.status;
+  });
+  rows.sort((a,b)=>Number(a.minimum_distance??a.km??1)-Number(b.minimum_distance??b.km??1));
+  // If Supabase has no active rows yet, keep the calculator usable with the
+  // development matrix already supplied with the prototype. This never
+  // overwrites the database and is clearly marked as development data.
+  if(!rows.length){
+    rows=SUPPLIED_DEVELOPMENT_FARES.map(x=>({...x,status:'development',version:'DEV-SUPPLIED-2026'}));
+  }
+  return rows;
+}
+function getFare(km){
+  const rows=activeFareRows();
+  const distance=Number(km);
+  if(!Number.isFinite(distance)||distance<0)throw new Error('Invalid road distance.');
+  const rounded=Math.max(1,Math.ceil(distance));
+
+  // Supports both point rows (km) and proper min/max distance ranges.
+  const range=rows.find(f=>{
+    const min=Number(f.minimum_distance??f.km??1);
+    const max=Number(f.maximum_distance??f.km??min);
+    return rounded>=min && rounded<=max;
+  });
+  if(range){
+    const regular=Number(range.regular??range.regular_fare);
+    const discountRaw=range.discount??range.discounted_fare;
+    const discount=Number.isFinite(Number(discountRaw))?Number(discountRaw):Number((regular*.8).toFixed(2));
+    if(!Number.isFinite(regular))throw new Error('The active fare matrix contains an invalid fare amount.');
+    return {regular,discount,version:range.version||range.id||'ACTIVE'};
+  }
+
+  // For distances beyond the last configured bracket, continue using the
+  // last-step increment instead of failing the entire calculation.
+  const max=rows[rows.length-1];
+  const maxKm=Number(max.maximum_distance??max.km??max.minimum_distance);
+  const maxReg=Number(max.regular??max.regular_fare);
+  if(Number.isFinite(maxKm)&&Number.isFinite(maxReg)&&rounded>maxKm){
+    const prev=rows.length>1?rows[rows.length-2]:max;
+    const prevReg=Number(prev.regular??prev.regular_fare??maxReg);
+    const prevKm=Number(prev.maximum_distance??prev.km??prev.minimum_distance??maxKm-1);
+    const increment=Math.max(0,maxReg-prevReg);
+    const stepKm=Math.max(1,maxKm-prevKm);
+    const reg=maxReg+Math.ceil((rounded-maxKm)/stepKm)*increment;
+    return {regular:reg,discount:Number((reg*.8).toFixed(2)),version:max.version||max.id||'ACTIVE'};
+  }
+  throw new Error('No applicable fare rule was found.');
+}
+function renderMatrix(){
+  const tb=$('matrix-tbody'); if(!tb)return; const rows=activeFareRows();
+  tb.innerHTML=rows.length?rows.map(f=>`<tr><td>${esc(f.km||f.minimum_distance)} km</td><td><span class="fare-pill reg">${money(f.regular||f.regular_fare)}</span></td><td><span class="fare-pill disc">${money(f.discount||f.discounted_fare)}</span></td></tr>`).join(''):`<tr><td colspan="3">No fare matrix is currently configured.</td></tr>`;
+}
+function createIcon(color,emoji){
+  return L.divIcon({html:`<div style="background:${color};width:36px;height:36px;border-radius:50% 50% 50% 4px;border:3px solid #fff;box-shadow:0 3px 12px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:16px;transform:rotate(-45deg)"><span style="transform:rotate(45deg)">${emoji}</span></div>`,iconSize:[36,36],iconAnchor:[18,34],popupAnchor:[0,-36]});
+}
+const iconPickup=createIcon('#2a7a4a','🟢'),iconDropoff=createIcon('#e05c2a','📍');
+
+const map=L.map('map',{center:[8.3648,124.8600],zoom:13,zoomControl:true});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);
+L.circle([8.3648,124.8600],{color:'#e05c2a',fillColor:'#e05c2a',fillOpacity:.04,weight:1.5,dashArray:'6,4'}).addTo(map).bindPopup('<b>Manolo Fortich, Bukidnon</b><br>Select pickup and drop-off points.');
+window.addEventListener('resize',()=>map.invalidateSize());
+
+async function reverseGeocode(lat,lng){
+  try{
+    const res=await fetch(`${GEOFARE_CONFIG.NOMINATIM_URL}/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`,{headers:{'Accept-Language':'en'}});
+    if(!res.ok) throw new Error();
+    const d=await res.json(),a=d.address||{};
+    return [a.road,a.suburb||a.village||a.town||a.municipality,a.province||a.state].filter(Boolean).slice(0,3).join(', ')||`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }catch{return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;}
+}
+function setMode(m){state.currentMode=m;document.querySelectorAll('.map-mode-btn').forEach(b=>b.classList.remove('active-mode'));$('mode-'+m)?.classList.add('active-mode');document.querySelectorAll('.pin-row').forEach(r=>r.classList.remove('active-pin'));$(''+m+'-row')?.classList.add('active-pin');updateInstruction();}
+function updateInstruction(){
+  const el=$('map-instruction'); if(!el)return;
+  if(!state.pickupMarker&&!state.dropoffMarker)el.innerHTML='Tap anywhere on the map to set your <strong>pickup</strong> point';
+  else if(state.pickupMarker&&!state.dropoffMarker)el.innerHTML='Now tap to set the <strong>drop-off</strong> point';
+  else if(!state.pickupMarker&&state.dropoffMarker)el.innerHTML='Now tap to set the <strong>pickup</strong> point';
+  else el.style.display='none';
+  if(state.pickupMarker&&state.dropoffMarker)el.style.display='none'; else el.style.display='block';
+}
+map.on('click',async e=>{
+  const {lat,lng}=e.latlng; setBusy(true,'Looking up location…');
+  try{
+    const addr=await reverseGeocode(lat,lng);
+    if(state.currentMode==='pickup'){if(state.pickupMarker)map.removeLayer(state.pickupMarker);state.pickupMarker=L.marker([lat,lng],{icon:iconPickup}).addTo(map).bindPopup(`<b>Pickup</b><br>${esc(addr)}`);$('pickup-addr').textContent=addr;if(!state.dropoffMarker)setMode('dropoff');}
+    else {if(state.dropoffMarker)map.removeLayer(state.dropoffMarker);state.dropoffMarker=L.marker([lat,lng],{icon:iconDropoff}).addTo(map).bindPopup(`<b>Drop-off</b><br>${esc(addr)}`);$('dropoff-addr').textContent=addr;}
+    updateInstruction(); if(state.pickupMarker&&state.dropoffMarker) await calculateFare();
+  }catch(err){toast(err.message||'Unable to set location.','error');}finally{setBusy(false);}
+});
+function clearPin(type){
+  if(type==='pickup'&&state.pickupMarker){map.removeLayer(state.pickupMarker);state.pickupMarker=null;$('pickup-addr').textContent='Tap map to set';}
+  if(type==='dropoff'&&state.dropoffMarker){map.removeLayer(state.dropoffMarker);state.dropoffMarker=null;$('dropoff-addr').textContent='Tap map to set';}
+  if(state.routeLine){map.removeLayer(state.routeLine);state.routeLine=null;}
+  $('fare-result').style.display='none';$('fare-actions').style.display='none';$('calculate-btn')?.style.setProperty('display','block');$('save-btn')?.style.setProperty('display','none');$('mobile-fare-float').classList.remove('visible');state.lastCalculation=null;updateInstruction();
+}
+function clearAll(){clearPin('pickup');clearPin('dropoff');setMode('pickup');}
+async function calculateFare(manual=false){
+  if(!state.pickupMarker||!state.dropoffMarker){
+    toast('Set both pickup and drop-off points first.','error');
+    return;
+  }
+  if(state.calculating)return;
+  const p=state.pickupMarker.getLatLng(),d=state.dropoffMarker.getLatLng();
+  if(Math.abs(p.lat-d.lat)<1e-7 && Math.abs(p.lng-d.lng)<1e-7){
+    toast('Pickup and drop-off cannot be the same location.','error');
+    return;
+  }
+  state.calculating=true; setBusy(true,'Calculating road-network route…'); showLoading(true);
+  try{
+    const endpoints=[GEOFARE_CONFIG.ROUTING_URL,GEOFARE_CONFIG.ROUTING_FALLBACK_URL].filter(Boolean);
+    let data=null,lastError=null,usedFallback=false;
+    for(const endpoint of endpoints){
+      try{
+        const controller=new AbortController();
+        const timer=setTimeout(()=>controller.abort(),12000);
+        const url=`${endpoint}/${p.lng},${p.lat};${d.lng},${d.lat}?overview=full&geometries=geojson&steps=false`;
+        const res=await fetch(url,{signal:controller.signal,headers:{'Accept':'application/json'}});
+        clearTimeout(timer);
+        if(!res.ok)throw new Error(`Routing service returned HTTP ${res.status}.`);
+        const candidate=await res.json();
+        if(candidate.code!=='Ok'||!candidate.routes?.length)throw new Error(candidate.message||'No route found.');
+        data=candidate;break;
+      }catch(e){lastError=e;}
+    }
+
+    let km,coords=null,routeMethod='OSRM road-network';
+    if(data?.routes?.length){
+      const route=data.routes[0];
+      km=Number(route.distance)/1000;
+      if(Array.isArray(route.geometry?.coordinates))coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
+      usedFallback=data.__fallback===true;
+    }else{
+      const R=6371;
+      const lat1=p.lat*Math.PI/180,lat2=d.lat*Math.PI/180;
+      const dLat=(d.lat-p.lat)*Math.PI/180,dLng=(d.lng-p.lng)*Math.PI/180;
+      const a=Math.sin(dLat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+      const straight=2*R*Math.asin(Math.sqrt(a));
+      km=Math.max(0.1,straight*1.25);
+      routeMethod='Estimated route (routing service unavailable)';
+      usedFallback=true;
+      toast('Routing service is temporarily unavailable. Showing an estimated fare; retry when road routing is available.','info');
+      lastError=lastError||new Error('Routing unavailable');
+    }
+
+    const fare=getFare(km);
+    if(state.routeLine)map.removeLayer(state.routeLine);
+    if(coords?.length){
+      state.routeLine=L.polyline(coords,{color:'#e05c2a',weight:4,opacity:.85}).addTo(map);
+      map.fitBounds(state.routeLine.getBounds(),{padding:[40,40]});
+    }else{
+      state.routeLine=L.polyline([[p.lat,p.lng],[d.lat,d.lng]],{color:'#e05c2a',weight:3,opacity:.65,dashArray:'8,8'}).addTo(map);
+      map.fitBounds(state.routeLine.getBounds(),{padding:[40,40]});
+    }
+    const distLabel=km.toFixed(2)+' km'+(usedFallback?' (estimated)':' (road-network)');
+    $('res-distance').textContent=distLabel;
+    $('res-regular').textContent=money(fare.regular);
+    $('res-discount').textContent=money(fare.discount);
+    $('fare-result').style.display='block';
+    $('fare-actions').style.display='flex';
+    $('calculate-btn').style.display='block';
+    $('save-btn').style.display='flex';
+    $('mff-dist').textContent=distLabel;$('mff-reg').textContent=money(fare.regular);$('mff-disc').textContent=money(fare.discount);$('mobile-fare-float').classList.add('visible');
+    state.lastCalculation={user_id:state.user.id,pickup:$('pickup-addr').textContent,dropoff:$('dropoff-addr').textContent,pickup_lat:p.lat,pickup_lng:p.lng,dropoff_lat:d.lat,dropoff_lng:d.lng,distance_km:Number(km.toFixed(3)),regular_fare:fare.regular,discounted_fare:fare.discount,fare_matrix_version:fare.version,route_method:routeMethod,routing_fallback:usedFallback,timestamp:new Date().toISOString(),created_at:new Date().toISOString()};
+    if(!usedFallback)toast('Fare calculated from actual road-network distance.','success');
+  }catch(err){
+    console.error('GeoFare fare calculation:',err);
+    $('fare-result').style.display='none';$('fare-actions').style.display='none';
+    toast(err.message||'Unable to calculate fare.','error');
+  }finally{state.calculating=false;setBusy(false);showLoading(false);}
+}
+function saveLog(){
+  if(!state.lastCalculation)return;
+  if(usingSupabase()) saveCalculationSupabase(); else {const a=read(STORAGE.calculations,[]);a.push({...state.lastCalculation,id:'calc-'+Date.now()});write(STORAGE.calculations,a);toast('Calculation saved to history.','success');$('save-btn').style.display='none';}
+}
+async function saveCalculationSupabase(){
+  try{
+    const payload={...state.lastCalculation};
+    const {error}=await supabaseClient.from('fare_calculations').insert(payload);
+    if(error)throw error;
+    await loadData(); renderLogs();
+    toast('Calculation saved to history.','success'); $('save-btn').style.display='none';
+  }catch(e){toast('Your calculation could not be saved. Check the database policy for fare_calculations.','error');}
+}
+function renderLogs(){
+  const el=$('logs-list'), logs=state.calculations||[];
+  $('logs-count').textContent=`${logs.length} record${logs.length===1?'':'s'}`;
+  const badge=$('log-badge'); if(badge){badge.style.display=logs.length?'inline':'none';badge.textContent=logs.length;}
+  if(!logs.length){el.innerHTML='<div class="log-empty"><div class="log-empty-icon">🛵</div>No fare calculations yet.<br>Use the map to calculate a fare.</div>';return;}
+  el.innerHTML=logs.map((l,i)=>`<div class="log-card"><div class="log-num">${logs.length-i}</div><div class="log-body"><div class="log-route">📍 ${esc(l.pickup||l.pickup_address||'Pickup')}<br>→ ${esc(l.dropoff||l.dropoff_address||'Drop-off')}</div><div class="log-meta"><span class="log-chip dist">📏 ${Number(l.distance_km||l.km||0).toFixed(2)} km</span><span class="log-chip fare">${money(l.regular_fare||l.regular||0)}</span><span class="log-chip disc">Discount ${money(l.discounted_fare||l.discount||0)}</span><span class="log-chip time">🕐 ${esc(new Date(l.created_at||l.timestamp||l.time||Date.now()).toLocaleString('en-PH'))}</span></div></div></div>`).join('');
+}
+async function clearLogs(){
+  if(!state.calculations.length || !confirm('Clear your fare calculation history?')) return;
+  try{
+    if(usingSupabase()){
+      const {error}=await supabaseClient.from('fare_calculations').delete().eq('user_id',state.user.id);
+      if(error) throw error;
+    }else{
+      const all=read(STORAGE.calculations,[]).filter(x=>x.user_id!==state.user.id); write(STORAGE.calculations,all);
+    }
+    await loadData(); renderLogs(); toast('Fare history cleared.','info');
+  }catch(e){toast('Fare history could not be cleared.','error');}
+}
+
+function riderPublicCard(r){
+  const p=r.profile||{}, verified=(r.verification_status||r.status)==='Verified';
+  const rs=state.ratings.filter(x=>x.rider_id===r.id);
+  const avg=rs.length?(rs.reduce((a,x)=>a+Number(x.professionalism+x.safety+x.punctuality+x.service_quality)/4,0)/rs.length).toFixed(1):'—';
+  return `<div class="data-card"><div style="display:flex;justify-content:space-between;gap:10px"><div><div class="card-title">${esc(p.full_name||r.full_name||'Unnamed Rider')}</div><div class="muted">${esc(r.public_id||r.rider_id||'No public ID')}</div></div><span class="status-badge ${verified?'status-verified':'status-pending'}">${verified?'Verified':'Not Verified'}</span></div><div class="score-row"><span>Business permit reference</span><strong>${esc(r.business_permit_reference||'Not provided')}</strong></div><div class="score-row"><span>Service area</span><strong>${esc(r.service_area||'—')}</strong></div><div class="score-row"><span>Average rating</span><strong>${avg}</strong></div></div>`;
+}
+function renderRiders(){
+  const q=($('rider-search')?.value||'').trim().toLowerCase(), verified=state.riders.filter(r=>(r.verification_status||r.status)==='Verified');
+  const rows=verified.filter(r=>!q||String(r.public_id||'').toLowerCase().includes(q)||String(r.profile?.full_name||r.full_name||'').toLowerCase().includes(q));
+  $('rider-results').innerHTML=rows.length?rows.map(riderPublicCard).join(''):'<div class="log-empty" style="grid-column:1/-1"><div class="log-empty-icon">✓</div>No verified riders found.</div>';
+  const sel=$('rating-rider'); if(sel){sel.innerHTML='<option value="">Select rider</option>'+verified.map(r=>`<option value="${esc(r.id)}">${esc(r.public_name||r.profile?.full_name||r.full_name||r.public_id)}</option>`).join('');}
+}
+$('rider-search-btn').onclick=renderRiders;$('rider-search').oninput=renderRiders;
+
+function renderRatings(){
+  const form=document.getElementById('rating-form'); if(form)form.style.display=state.role==='commuter'?'block':'none';
+  const mine=state.role==='rider'?state.ratings.filter(r=>r.rider_id===getCurrentRider()?.id||r.rider_id===state.profile?.rider_id||r.rider_id===state.user?.id):state.ratings;
+  if(!mine.length)$('ratings-content').innerHTML='<div class="log-empty"><div class="log-empty-icon">★</div>No ratings yet.<br>Ratings will appear after commuters submit feedback.</div>';
+  else $('ratings-content').innerHTML=`<div class="card-grid">${mine.map(r=>`<div class="data-card"><div class="card-title">${esc(r.rider_name||r.rider_id||'Rider')}</div><div class="score-row"><span>Professionalism</span><strong>${r.professionalism}/5</strong></div><div class="score-row"><span>Safety</span><strong>${r.safety}/5</strong></div><div class="score-row"><span>Punctuality</span><strong>${r.punctuality}/5</strong></div><div class="score-row"><span>Service Quality</span><strong>${r.service_quality}/5</strong></div><p class="muted" style="margin-top:10px">${esc(r.comment||'No comment')}</p></div>`).join('')}</div>`;
+}
+$('rating-form').onsubmit=async e=>{
+  e.preventDefault(); if(state.role!=='commuter'){toast('Only commuter accounts can submit rider feedback.','error');return;}
+  const values={rider_id:$('rating-rider').value,professionalism:+$('rate-prof').value,safety:+$('rate-safe').value,punctuality:+$('rate-punct').value,service_quality:+$('rate-service').value,comment:$('rate-comment').value.trim()};
+  if(!values.rider_id||Object.values(values).some((v,i)=>i>0&&(!Number.isInteger(v)||v<1||v>5))){toast('Please provide valid 1–5 ratings for all criteria.','error');return;}
+  try{
+    if(usingSupabase()){const {error}=await supabaseClient.from('ratings').insert({...values,commuter_id:state.user.id});if(error)throw error;}
+    else{const a=read(STORAGE.ratings,[]);a.push({...values,id:'rating-'+Date.now(),commuter_id:state.user.id,created_at:new Date().toISOString()});write(STORAGE.ratings,a);state.ratings=a;}
+    $('rating-form').reset();renderRatings();toast('Rating submitted.','success');
+  }catch{toast('Your rating could not be submitted. Please try again.','error');}
+};
+
+function reportTypeLabel(v){return ({overcharging:'Fare concern / overcharging','refuse-discount':'Discount concern','rude-conduct':'Rider conduct','unsafe-driving':'Unsafe behavior','other':'Other transportation concern'})[v]||v;}
+$('refresh-reports').onclick=()=>loadData().then(renderReports);
+$('report-filter').onchange=renderReports;
+function renderReports(){
+  const own=state.role==='admin'?state.reports:state.reports.filter(r=>r.user_id===state.user.id||r.complainant_id===state.user.id);
+  const filter=$('report-filter').value; const rows=own.filter(r=>filter==='all'||r.status===filter);
+  if(!rows.length){$('reports-content').innerHTML='<div class="log-empty"><div class="log-empty-icon">⚠</div>No incidents or complaints have been submitted.</div>';return;}
+  $('reports-content').innerHTML=rows.map(r=>`<div class="data-card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px"><div class="card-title">${esc(r.reference_no||r.ref||'Report')}</div><span class="status-badge ${statusClass(r.status||'New')}">${esc(r.status||'New')}</span></div><div class="muted">${esc(r.category||r.type||'Other transportation concern')} · ${esc(new Date(r.created_at||r.filed||Date.now()).toLocaleString('en-PH'))}</div><p style="margin-top:9px;font-size:13px;line-height:1.5">${esc(r.description||r.desc||'')}</p>${state.role==='admin'?`<div class="toolbar-row" style="margin-top:12px"><select class="form-select report-status" data-id="${esc(r.id)}"><option ${r.status==='New'?'selected':''}>New</option><option ${r.status==='Under Review'?'selected':''}>Under Review</option><option ${r.status==='Resolved'?'selected':''}>Resolved</option><option ${r.status==='Dismissed'?'selected':''}>Dismissed</option></select><button class="btn btn-primary btn-sm update-report" data-id="${esc(r.id)}">Update status</button></div>`:''}</div>`).join('');
+  document.querySelectorAll('.update-report').forEach(btn=>btn.onclick=()=>updateReport(btn.dataset.id));
+}
+async function updateReport(id){
+  const status=document.querySelector(`.report-status[data-id="${CSS.escape(id)}"]`).value;
+  try{
+    if(usingSupabase()){const {error}=await supabaseClient.from('incidents').update({status}).eq('id',id);if(error)throw error;}
+    else{const a=read(STORAGE.reports,[]);const r=a.find(x=>x.id===id);if(!r)throw new Error();r.status=status;write(STORAGE.reports,a);state.reports=a;await addAudit('Admin changed report status',id,{status});}
+    await loadData();renderReports();renderAdmin();toast('Report status updated.','success');
+  }catch{toast('The report could not be updated.','error');}
+}
+
+function bindReportForm(){
+  const oldButton=document.querySelector('#panel-report .btn-primary'); if(oldButton) oldButton.onclick=generateReport;
+}
+function generateReport(){
+  const plate=$('rpt-plate').value.trim().toUpperCase(),dt=$('rpt-datetime').value,route=$('rpt-route').value.trim(),fare=$('rpt-fare').value,type=$('rpt-type').value,desc=$('rpt-desc').value.trim(),name=$('rpt-name').value.trim()||'Anonymous';
+  if(!plate||!dt||!route||!fare||!type||!desc){toast('Please fill all required report fields.','error');return;}
+  const ref='RPT-'+Date.now().toString(36).toUpperCase();
+  $('rp-ref').textContent=ref;
+  $('rp-fields').innerHTML=[['Reference No.',ref],['Date Filed',nowPH()],['Rider/Plate',plate],['Incident Date/Time',new Date(dt).toLocaleString('en-PH')],['Route',route],['Fare Demanded',money(fare)],['Category',reportTypeLabel(type)],['Description',desc],['Complainant',name]].map(([k,v])=>`<div class="rp-field"><div class="rp-key">${esc(k)}</div><div class="rp-val">${esc(v)}</div></div>`).join('');
+  $('report-preview').classList.add('visible');$('report-actions').style.display='flex';
+  window._currentReport={reference_no:ref,plate,incident_datetime:dt,route,fare:Number(fare),category:type,description:desc,complainant:name,created_at:new Date().toISOString(),status:'New'};
+  toast('Report prepared. Submit/save it from this record; GeoFare does not provide emergency response.','success');
+}
+function saveReportLog(){
+  if(!window._currentReport)return;
+  submitReport(window._currentReport);
+}
+async function submitReport(r){
+  try{
+    if(usingSupabase()){
+      const {error}=await supabaseClient.from('incidents').insert({reference_no:r.reference_no,complainant_id:state.user.id,category:r.category,description:r.description,incident_datetime:r.incident_datetime,location_text:r.route,rider_reference:r.plate,status:'New'});
+      if(error)throw error;
+    }else{const a=read(STORAGE.reports,[]);a.push({...r,id:'report-'+Date.now(),user_id:state.user.id});write(STORAGE.reports,a);state.reports=a;}
+    toast('Report submitted for administrative review.','success');window._currentReport=null;await loadData();renderReports();
+  }catch{toast('Your report could not be submitted. Please try again.','error');}
+}
+function printReport(){const p=$('report-preview'),w=window.open('','_blank','width=700,height=900');if(!w)return;w.document.write(`<html><head><title>GeoFare Incident Report</title><style>body{font-family:Arial;padding:40px;max-width:680px;margin:auto}.rp-field{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #ddd}.rp-key{width:150px;font-weight:bold;font-size:12px}.rp-val{font-size:13px}.rp-header{text-align:center;margin-bottom:20px}.rp-footer{margin-top:20px;font-size:11px;color:#666}</style></head><body>${p.innerHTML}</body></html>`);w.document.close();w.print();}
+function clearReport(){['rpt-plate','rpt-datetime','rpt-route','rpt-fare','rpt-desc','rpt-name'].forEach(id=>{if($(id))$(id).value=''});$('rpt-type').value='';$('report-preview').classList.remove('visible');$('report-actions').style.display='none';window._currentReport=null;}
+$('save-report-btn')?.addEventListener('click',saveReportLog);
+
+
+function getCurrentRider(){
+  return state.riders.find(r=>r.profile_id===state.user?.id || r.id===state.profile?.rider_id || r.rider_id===state.user?.id);
+}
+function riderAverageRating(riderId){
+  const rows=state.ratings.filter(r=>String(r.rider_id)===String(riderId));
+  if(!rows.length)return null;
+  const avg=rows.reduce((sum,r)=>sum+(Number(r.professionalism||0)+Number(r.safety||0)+Number(r.punctuality||0)+Number(r.service_quality||0))/4,0)/rows.length;
+  return avg.toFixed(1);
+}
+function renderCommuterDashboard(){
+  const name=state.profile?.full_name||state.user?.user_metadata?.full_name||'Commuter';
+  $('commuter-name').textContent=name;
+  $('commuter-status').textContent=`${roleLabel(state.role)} · ${state.profile?.status||'active'}`;
+  const ownReports=state.reports.filter(r=>r.user_id===state.user.id||r.complainant_id===state.user.id);
+  const ownAlerts=state.safetyAlerts.filter(a=>a.user_id===state.user.id||a.sender_id===state.user.id);
+  $('commuter-kpis').innerHTML=[
+    ['🧾','Fare calculations',state.calculations.length],
+    ['⚠️','My reports',ownReports.length],
+    ['🆘','SOS alerts',ownAlerts.length],
+    ['✓','Verified riders',state.riders.filter(r=>(r.verification_status||r.status)==='Verified').length]
+  ].map(([i,l,v])=>`<div class="kpi"><div class="kpi-icon">${i}</div><div class="kpi-value">${v}</div><div class="kpi-label">${l}</div></div>`).join('');
+  const latest=ownAlerts[0];
+  $('commuter-safety-summary').innerHTML=latest
+    ? `<div class="score-row"><span>Latest alert</span><strong>${esc(latest.status||'New')}</strong></div><div class="score-row"><span>Submitted</span><strong>${esc(new Date(latest.created_at||Date.now()).toLocaleString('en-PH'))}</strong></div><div class="small-note" style="margin-top:10px">Use the Safety & SOS section to view the complete alert record.</div>`
+    : '<div class="empty-state">No SOS alerts recorded for this account.</div>';
+}
+
+function checkRiderFareCompliance(){
+  const km=Number(document.getElementById('rider-check-distance')?.value);
+  const charged=Number(document.getElementById('rider-check-charged')?.value);
+  const target=document.getElementById('rider-fare-summary');
+  if(!Number.isFinite(km)||km<=0||!Number.isFinite(charged)||charged<0){toast('Enter a valid distance and fare collected.','error');return;}
+  try{
+    const fare=getFare(km), diff=charged-fare.regular;
+    const status=Math.abs(diff)<0.005?'Within matrix':diff>0?'Above matrix':'Below matrix';
+    const tone=status==='Within matrix'?'status-verified':status==='Above matrix'?'status-rejected':'status-pending';
+    target.innerHTML=`<div class="score-row"><span>Road distance</span><strong>${km.toFixed(2)} km</strong></div><div class="score-row"><span>Expected regular fare</span><strong>${money(fare.regular)}</strong></div><div class="score-row"><span>Fare collected</span><strong>${money(charged)}</strong></div><div class="score-row"><span>Difference</span><strong>${money(Math.abs(diff))}</strong></div><div style="margin-top:12px"><span class="status-badge ${tone}">${status}</span></div>`;
+  }catch(e){target.innerHTML='<div class="empty-state">No active fare rule applies to this distance.</div>';toast(e.message,'error');}
+}
+function renderRiderDashboard(){
+  const r=getCurrentRider();
+  const verification=r?.verification_status||r?.status||'Pending';
+  $('rider-verification').textContent=verification;
+  $('rider-public-id').textContent=`Public ID ${r?.public_id||r?.rider_id||'—'}`;
+  const rating=r?riderAverageRating(r.id):null;
+  const myReports=state.reports.filter(x=>x.rider_reference===r?.public_id||x.rider_reference===r?.id);
+  const alerts=state.safetyAlerts.filter(a=>a.rider_id===r?.id||a.rider_reference===r?.public_id||a.user_id===state.user.id);
+  $('rider-kpis').innerHTML=[
+    ['✓','Verification',verification],
+    ['★','Average rating',rating||'—'],
+    ['⚠️','Related reports',myReports.length],
+    ['🆘','Related safety alerts',alerts.length]
+  ].map(([i,l,v])=>`<div class="kpi"><div class="kpi-icon">${i}</div><div class="kpi-value" style="font-size:${String(v).length>9?'16px':'22px'}">${esc(v)}</div><div class="kpi-label">${l}</div></div>`).join('');
+  const rows=activeFareRows().slice(0,3);
+  $('rider-fare-summary').innerHTML=rows.length?rows.map(f=>`<div class="score-row"><span>${esc(f.km||f.minimum_distance)} km</span><strong>${money(f.regular||f.regular_fare)}</strong></div>`).join(''):'<div class="empty-state">No active fare matrix.</div>';
+  $('rider-alert-summary').innerHTML=alerts.length?alerts.slice(0,3).map(a=>`<div class="score-row"><span>${esc(a.reference_no||a.id||'Alert')}</span><strong>${esc(a.status||'New')}</strong></div>`).join(''):'<div class="empty-state">No related safety alerts.</div>';
+}
+async function sendSOS(){
+  const message=($('sos-message')?.value||'').trim();
+  if(!message){toast('Please describe the safety concern before sending an SOS alert.','error');return;}
+  if(!state.user){toast('You must be signed in to send an SOS alert.','error');return;}
+  setBusy(true,'Preparing SOS alert…');
+  try{
+    let coords={latitude:null,longitude:null};
+    if(navigator.geolocation){
+      try{
+        const pos=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:8000}));
+        coords={latitude:pos.coords.latitude,longitude:pos.coords.longitude};
+      }catch(_){}
+    }
+    const payload={user_id:state.user.id,latitude:coords.latitude,longitude:coords.longitude,message,location_text:coords.latitude?`${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`:'Location unavailable',status:'New',created_at:new Date().toISOString()};
+    if(usingSupabase()){
+      const {error}=await supabaseClient.from('safety_alerts').insert(payload);
+      if(error)throw error;
+    }else{
+      const a=read(STORAGE.safety,[]);a.unshift({id:'sos-'+Date.now(),...payload});write(STORAGE.safety,a);
+    }
+    $('sos-message').value=''; await loadData(); renderSafety(); if(state.role==='commuter')renderCommuterDashboard(); toast('SOS alert recorded and sent to the authorized safety dashboard.','success');
+  }catch(e){
+    toast('SOS alert could not be recorded. Confirm the safety_alerts table and RLS policy are configured.','error');
+  }finally{setBusy(false);}
+}
+function safetyStatusClass(status){return statusClass(status||'New')}
+function renderSafety(){
+  const isManager=['admin','responder'].includes(state.role);
+  const own=isManager?state.safetyAlerts:(state.role==='rider'?state.safetyAlerts.filter(a=>a.rider_id===getCurrentRider()?.id||a.rider_reference===getCurrentRider()?.public_id||a.user_id===state.user.id):state.safetyAlerts.filter(a=>a.user_id===state.user.id||a.sender_id===state.user.id));
+  const sosForm=document.getElementById('sos-form-card'); if(sosForm)sosForm.style.display=state.role==='commuter'?'block':'none';
+  const adminBlock=document.getElementById('admin-safety-block'); if(adminBlock)adminBlock.style.display=state.role==='admin'?'block':'none';
+  const title=document.getElementById('safety-list-title'); if(title)title.textContent=state.role==='admin'?'Alert queue':state.role==='responder'?'Incoming alerts':'My recent alerts';
+  const el=$('my-safety-alerts'); if(el){
+    el.innerHTML=own.length?own.slice(0,10).map(a=>`<div class="data-card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:10px"><strong>${esc(a.reference_no||a.id||'SOS Alert')}</strong><span class="status-badge ${safetyStatusClass(a.status)}">${esc(a.status||'New')}</span></div><div class="muted" style="margin-top:4px">${esc(new Date(a.created_at||Date.now()).toLocaleString('en-PH'))}</div><p style="font-size:12.5px;line-height:1.5;margin-top:8px">${esc(a.message||a.description||'')}</p>${a.location_text?`<div class="small-note">Location: ${esc(a.location_text)}</div>`:''}</div>`).join(''):'<div class="empty-state">No safety alerts recorded.</div>';
+  }
+  if(state.role==='admin') renderAdminSafety();
+  if(state.role==='responder') renderResponder();
+}
+function renderAdminSafety(){
+  if(state.role!=='admin')return;
+  const el=document.getElementById('reports-content');
+  // admin safety panel has its own target inserted below when available
+  const target=document.getElementById('admin-safety-content'); if(!target)return;
+  target.innerHTML=state.safetyAlerts.length?state.safetyAlerts.map(a=>`<div class="data-card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:10px"><div><div class="card-title">${esc(a.reference_no||a.id||'SOS Alert')}</div><div class="muted">${esc(a.location_text||'Location unavailable')}</div></div><span class="status-badge ${safetyStatusClass(a.status)}">${esc(a.status||'New')}</span></div><p style="margin-top:9px;font-size:13px">${esc(a.message||'')}</p><div class="table-actions" style="margin-top:10px">${['Acknowledged','Responded','Resolved'].map(s=>`<button class="btn btn-secondary btn-sm safety-status-btn" data-id="${esc(a.id)}" data-status="${s}">${s}</button>`).join('')}</div></div>`).join(''):'<div class="empty-state">No SOS alerts.</div>';
+  document.querySelectorAll('.safety-status-btn').forEach(b=>b.onclick=()=>updateSafetyStatus(b.dataset.id,b.dataset.status));
+}
+async function updateSafetyStatus(id,status){
+  try{
+    if(usingSupabase()){
+      const {error}=await supabaseClient.from('safety_alerts').update({status,updated_at:new Date().toISOString(),handled_by:state.user.id}).eq('id',id);if(error)throw error;
+    }else{
+      const a=read(STORAGE.safety,[]);const r=a.find(x=>x.id===id);if(!r)throw new Error();r.status=status;r.handled_by=state.user.id;r.updated_at=new Date().toISOString();write(STORAGE.safety,a);
+    }
+    await loadData();renderSafety();renderAdmin();renderResponder();toast(`Safety alert marked ${status}.`,'success');
+  }catch(e){toast('Safety alert status could not be updated.','error');}
+}
+function renderResponder(){
+  if(state.role!=='responder')return;
+  const rows=state.safetyAlerts;
+  const active=rows.filter(a=>!['Resolved','Dismissed'].includes(a.status)).length;
+  $('responder-stats').innerHTML=[['🆘',rows.length,'Total alerts'],['⚠️',active,'Active alerts'],['✓',rows.filter(a=>a.status==='Responded').length,'Responded'],['●',rows.filter(a=>a.status==='Resolved').length,'Resolved']].map(([i,v,l])=>`<div class="stat-card"><div style="font-size:20px">${i}</div><div class="stat-value">${v}</div><div class="stat-label">${l}</div></div>`).join('');
+  const el=$('responder-alerts');el.innerHTML=rows.length?rows.map(a=>`<div class="data-card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:10px"><div class="card-title">${esc(a.reference_no||a.id||'SOS Alert')}</div><span class="status-badge ${safetyStatusClass(a.status)}">${esc(a.status||'New')}</span></div><div class="muted">${esc(new Date(a.created_at||Date.now()).toLocaleString('en-PH'))} · ${esc(a.location_text||'Location unavailable')}</div><p style="margin:9px 0;font-size:13px;line-height:1.5">${esc(a.message||'')}</p><div class="table-actions">${['Acknowledged','Responded','Resolved'].map(s=>`<button class="btn btn-secondary btn-sm responder-status-btn" data-id="${esc(a.id)}" data-status="${s}">${s}</button>`).join('')}</div></div>`).join(''):'<div class="empty-state">No incoming SOS alerts.</div>';
+  document.querySelectorAll('.responder-status-btn').forEach(b=>b.onclick=()=>updateSafetyStatus(b.dataset.id,b.dataset.status));
+}
+function renderRouteRecords(){
+  if(!['admin','responder'].includes(state.role))return;
+  const rows=state.role==='admin'?state.calculations:state.calculations;
+  const target=$('route-records-content');
+  if(!rows.length){target.innerHTML='<div class="empty-state">No route calculation records are available for this account.</div>';return;}
+  target.innerHTML=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Route</th><th>Distance</th><th>Regular</th><th>Discount</th><th>Recorded</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.pickup||'Pickup')} → ${esc(r.dropoff||'Drop-off')}</td><td>${Number(r.distance_km||0).toFixed(2)} km</td><td>${money(r.regular_fare||0)}</td><td>${money(r.discounted_fare||0)}</td><td>${esc(new Date(r.created_at||r.timestamp||Date.now()).toLocaleString('en-PH'))}</td></tr>`).join('')}</tbody></table></div>`;
+}
+document.getElementById('sos-map-btn')?.addEventListener('click',()=>showPanel('safety'));
+document.getElementById('sos-submit')?.addEventListener('click',sendSOS);
+document.getElementById('locate-btn')?.addEventListener('click',useMyLocation);
+document.getElementById('rider-check-btn')?.addEventListener('click',checkRiderFareCompliance);
+document.querySelectorAll('[data-panel]').forEach(b=>b.addEventListener('click',()=>showPanel(b.dataset.panel)));
+
+
+function renderBarangays(){
+  if(state.role!=='admin')return;
+  const rows=state.barangays||[];
+  $('barangays-content').innerHTML=rows.length
+    ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Barangay</th><th>Code</th><th>Status</th><th>Description</th><th>Updated</th><th>Actions</th></tr></thead><tbody>${rows.map(b=>`<tr><td>${esc(b.name||b.barangay_name||'—')}</td><td>${esc(b.code||b.identifier||'—')}</td><td><span class="status-badge ${String(b.status||'Active').toLowerCase()==='active'?'status-verified':'status-rejected'}">${esc(b.status||'Active')}</span></td><td>${esc(b.description||b.notes||'—')}</td><td>${esc(new Date(b.updated_at||b.created_at||Date.now()).toLocaleString('en-PH'))}</td><td class="table-actions"><button class="btn btn-secondary btn-sm edit-barangay" data-id="${esc(b.id)}">Edit</button><button class="btn btn-danger btn-sm delete-barangay" data-id="${esc(b.id)}">Delete</button></td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="empty-state">No barangay reference records are configured.</div>';
+  document.querySelectorAll('.edit-barangay').forEach(btn=>btn.onclick=()=>{
+    const b=rows.find(x=>String(x.id)===String(btn.dataset.id)); if(!b)return;
+    $('barangay-id').value=b.id||'';$('barangay-name').value=b.name||b.barangay_name||'';$('barangay-code').value=b.code||b.identifier||'';$('barangay-status').value=b.status||'Active';$('barangay-description').value=b.description||b.notes||'';
+    $('barangay-name').scrollIntoView({behavior:'smooth',block:'center'});
+  });
+  document.querySelectorAll('.delete-barangay').forEach(btn=>btn.onclick=()=>deleteBarangay(btn.dataset.id));
+}
+async function deleteBarangay(id){
+  if(!confirm('Delete this barangay reference record? This cannot be undone.'))return;
+  try{
+    if(usingSupabase()){const {error}=await supabaseClient.from('barangays').delete().eq('id',id);if(error)throw error;}
+    else{const a=read(STORAGE.barangays,[]).filter(x=>String(x.id)!==String(id));write(STORAGE.barangays,a);}
+    await addAudit('Admin deleted barangay',id,{});
+    await loadData();renderBarangays();toast('Barangay record deleted.','success');
+  }catch(e){toast('The barangay record could not be deleted.','error');}
+}
+$('barangay-form').onsubmit=async e=>{
+  e.preventDefault(); if(state.role!=='admin')return;
+  const id=$('barangay-id').value.trim(), payload={name:$('barangay-name').value.trim(),code:$('barangay-code').value.trim(),status:$('barangay-status').value,description:$('barangay-description').value.trim(),updated_at:new Date().toISOString()};
+  if(!payload.name){toast('Barangay name is required.','error');return;}
+  try{
+    if(usingSupabase()){
+      const result=id
+        ? await supabaseClient.from('barangays').update({...payload,updated_by:state.user.id}).eq('id',id)
+        : await supabaseClient.from('barangays').insert({...payload,created_by:state.user.id});
+      if(result.error)throw result.error;
+      await addAudit(id?'Admin updated barangay':'Admin added barangay',id||payload.name,{status:payload.status});
+    }else{
+      const a=read(STORAGE.barangays,[]);
+      if(id){const r=a.find(x=>String(x.id)===id);if(r)Object.assign(r,payload);}
+      else a.push({id:'brgy-'+Date.now(),...payload,created_at:new Date().toISOString(),created_by:state.user.id});
+      write(STORAGE.barangays,a);await addAudit(id?'Admin updated barangay':'Admin added barangay',id||payload.name,{status:payload.status});
+    }
+    await loadData();renderBarangays();e.target.reset();$('barangay-id').value='';toast('Barangay data saved.','success');
+  }catch(e){toast('Barangay data could not be saved. Confirm the barangays table and RLS policy.','error');}
+};
+$('barangay-reset').onclick=()=>{$('barangay-form').reset();$('barangay-id').value='';};
+function renderAdmin(){
+  if(state.role!=='admin')return;
+  renderAdminSafety();
+  const reports=state.reports, pending=state.riders.filter(r=>(r.verification_status||r.status)==='Pending'),verified=state.riders.filter(r=>(r.verification_status||r.status)==='Verified');
+  const stats=[['Total Users',state.users.length],['Registered Riders',state.riders.length],['Verified Riders',verified.length],['Pending Verification',pending.length],['Active Fare Rows',activeFareRows().length],['Total Reports',reports.length],['Pending Reports',reports.filter(r=>r.status==='New'||r.status==='Under Review').length],['Resolved Reports',reports.filter(r=>r.status==='Resolved').length],['Active SOS Alerts',state.safetyAlerts.filter(a=>!['Resolved','Dismissed'].includes(a.status)).length]];
+  $('admin-stats').innerHTML=stats.map(([l,v])=>`<div class="stat-card"><div class="stat-value">${Number(v||0)}</div><div class="stat-label">${l}</div></div>`).join('');
+  $('pending-riders').innerHTML=pending.length?pending.map(r=>`<div class="data-card" style="margin-bottom:10px"><div class="card-title">${esc(r.profile?.full_name||r.full_name||r.id)}</div><div class="muted">${esc(r.business_permit_reference||'No permit reference')}</div><div class="toolbar-row" style="margin-top:10px"><button class="btn btn-primary btn-sm verify-rider" data-id="${esc(r.id)}">Verify</button><button class="btn btn-danger btn-sm reject-rider" data-id="${esc(r.id)}">Reject</button></div></div>`).join(''):'<div class="muted">No pending rider verifications.</div>';
+  $('audit-preview').innerHTML=state.audit.slice(-6).reverse().map(a=>`<div class="score-row"><span>${esc(a.action)}</span><strong>${esc(new Date(a.created_at||a.timestamp||Date.now()).toLocaleString('en-PH'))}</strong></div>`).join('')||'<div class="muted">No administrative activity recorded.</div>';
+  document.querySelectorAll('.verify-rider').forEach(b=>b.onclick=()=>setRiderVerification(b.dataset.id,'Verified'));
+  document.querySelectorAll('.reject-rider').forEach(b=>b.onclick=()=>setRiderVerification(b.dataset.id,'Rejected'));
+}
+async function setRiderVerification(id,status){
+  try{
+    if(usingSupabase()){const {error}=await supabaseClient.from('rider_verifications').insert({rider_id:id,reviewed_by:state.user.id,status,review_note:`Status set to ${status}`});if(error)throw error;}
+    else{const a=read(STORAGE.riders,[]);const r=a.find(x=>x.id===id);if(!r)throw new Error();r.verification_status=status;write(STORAGE.riders,a);state.riders=a.map(x=>({...x,profile:read(STORAGE.profiles,[]).find(p=>p.id===x.profile_id)||{}}));addAudit(`Admin ${status.toLowerCase()} rider`,id,{status});}
+    await loadData();renderAdmin();renderRiders();toast(`Rider marked ${status}.`,'success');
+  }catch{toast('Rider verification could not be updated.','error');}
+}
+function renderFareAdmin(){
+  const rows=activeFareRows();
+  $('fare-admin-table').innerHTML=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Distance</th><th>Regular</th><th>Discounted</th><th>Version</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows.map(f=>`<tr><td>${esc(f.km||f.minimum_distance)} km</td><td>${money(f.regular||f.regular_fare)}</td><td>${money(f.discount||f.discounted_fare)}</td><td>${esc(f.version||f.id||'ACTIVE')}</td><td>${esc(f.status||'active')}</td><td class="table-actions"><button class="btn btn-secondary btn-sm edit-fare" data-km="${esc(f.km||f.minimum_distance)}">Edit</button><button class="btn btn-danger btn-sm delete-fare" data-km="${esc(f.km||f.minimum_distance)}">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
+  document.querySelectorAll('.edit-fare').forEach(b=>b.onclick=()=>{const f=rows.find(x=>Number(x.km||x.minimum_distance)===Number(b.dataset.km));if(f){$('fare-km').value=f.km;$('fare-regular').value=f.regular;$('fare-discount').value=f.discount;$('fare-km').scrollIntoView({behavior:'smooth',block:'center'});}});
+  document.querySelectorAll('.delete-fare').forEach(b=>b.onclick=()=>deleteFareRow(b.dataset.km));
+}
+async function deleteFareRow(km){
+  if(!confirm(`Remove the fare rule for ${km} km? Commuters will fall back to the next available bracket.`))return;
+  try{
+    if(usingSupabase()){const {error}=await supabaseClient.from('fare_matrix_versions').delete().eq('minimum_distance',Number(km));if(error)throw error;}
+    else{const a=read(STORAGE.fares,[]).filter(x=>Number(x.km)!==Number(km));write(STORAGE.fares,a);state.fareMatrix=a;}
+    await addAudit('Admin deleted fare matrix row',String(km),{});
+    await loadData();renderFareAdmin();renderMatrix();renderAdmin();
+    toast('Fare row removed.','success');
+  }catch(e){toast('The fare row could not be removed.','error');}
+}
+$('fare-admin-form').onsubmit=async e=>{
+  e.preventDefault(); if(state.role!=='admin')return;
+  const km=Number($('fare-km').value),regular=Number($('fare-regular').value),discount=Number($('fare-discount').value);
+  if(!Number.isInteger(km)||km<1||regular<0||discount<0){toast('Fare matrix values are invalid.','error');return;}
+  try{
+    if(usingSupabase()){const {error}=await supabaseClient.from('fare_matrix_versions').insert({minimum_distance:km,maximum_distance:km,regular_fare:regular,discounted_fare:discount,status:'active',effective_from:new Date().toISOString(),created_by:state.user.id});if(error)throw error;}
+    else{const a=read(STORAGE.fares,[]).map(x=>Number(x.km)===km?{...x,regular,discount,version:'DEV-ADMIN-'+Date.now(),updated_at:new Date().toISOString(),status:'development'}:x);if(!a.some(x=>Number(x.km)===km))a.push({km,regular,discount,version:'DEV-ADMIN-'+Date.now(),status:'development'});write(STORAGE.fares,a);state.fareMatrix=a;addAudit('Admin updated fare matrix',String(km),{regular,discount});}
+    await loadData();renderMatrix();renderFareAdmin();renderAdmin();e.target.reset();toast('Fare matrix record saved.','success');
+  }catch{toast('Fare matrix update failed. No data was changed.','error');}
+};
+
+function renderUsers(){
+  if(!state.users.length){$('users-content').innerHTML='<div class="log-empty"><div class="log-empty-icon">◉</div>No user records are available.</div>';return;}
+  $('users-content').innerHTML=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Rider ID</th><th>Created</th><th>Actions</th></tr></thead><tbody>${state.users.map(u=>{
+    const rider=state.riders.find(r=>r.profile_id===u.id);
+    const isSelf=u.id===state.user?.id;
+    const suspended=String(u.status||'active').toLowerCase()==='suspended';
+    return `<tr>
+      <td>${esc(u.full_name||u.name||'Unnamed User')}</td>
+      <td>${esc(u.email||'—')}</td>
+      <td><select class="form-select user-role-select" data-id="${esc(u.id)}" ${isSelf?'disabled title="You cannot change your own role"':''} style="min-width:150px;padding:6px 8px;font-size:12px">${['commuter','rider','admin','responder'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${roleLabel(r)}</option>`).join('')}</select></td>
+      <td><span class="status-badge ${statusClass(u.status||'active')}">${esc(u.status||'active')}</span></td>
+      <td>${esc(rider?.public_id||'—')}</td>
+      <td>${u.created_at?esc(new Date(u.created_at).toLocaleString('en-PH')):'—'}</td>
+      <td class="table-actions"><button class="btn btn-secondary btn-sm toggle-user-status" data-id="${esc(u.id)}" data-status="${suspended?'active':'suspended'}" ${isSelf?'disabled title="You cannot suspend your own account"':''}>${suspended?'Activate':'Suspend'}</button></td>
+    </tr>`;
+  }).join('')}</tbody></table></div>`;
+  document.querySelectorAll('.user-role-select').forEach(sel=>sel.onchange=()=>updateUserRole(sel.dataset.id,sel.value));
+  document.querySelectorAll('.toggle-user-status').forEach(b=>b.onclick=()=>updateUserStatus(b.dataset.id,b.dataset.status));
+}
+async function updateUserRole(id,role){
+  try{
+    if(usingSupabase()){const {error}=await supabaseClient.from('profiles').update({role}).eq('id',id);if(error)throw error;}
+    else{
+      const users=read(STORAGE.users,[]);const u=users.find(x=>x.id===id);if(u)u.role=role;write(STORAGE.users,users);
+      const profiles=read(STORAGE.profiles,[]);const p=profiles.find(x=>x.id===id);if(p)p.role=role;write(STORAGE.profiles,profiles);
+    }
+    await addAudit('Admin changed user role',id,{role});
+    await loadData();renderUsers();renderAdmin();
+    toast('User role updated.','success');
+  }catch(e){toast('User role could not be updated.','error');}
+}
+async function updateUserStatus(id,status){
+  try{
+    if(usingSupabase()){const {error}=await supabaseClient.from('profiles').update({status}).eq('id',id);if(error)throw error;}
+    else{
+      const users=read(STORAGE.users,[]);const u=users.find(x=>x.id===id);if(u)u.status=status;write(STORAGE.users,users);
+      const profiles=read(STORAGE.profiles,[]);const p=profiles.find(x=>x.id===id);if(p)p.status=status;write(STORAGE.profiles,profiles);
+    }
+    await addAudit(`Admin set user status to ${status}`,id,{status});
+    await loadData();renderUsers();renderAdmin();
+    toast(`User account marked ${status}.`,'success');
+  }catch(e){toast('User status could not be updated.','error');}
+}
+async function addAudit(action,target,meta={}){
+  const record={user_id:state.user?.id,action,target,metadata:meta,created_at:new Date().toISOString()};
+  if(usingSupabase()){
+    try{await supabaseClient.from('audit_logs').insert(record);return;}catch(e){console.warn('Audit log not written:',e.message);}
+  }
+  const a=read(STORAGE.audit,[]);a.push({...record,id:'audit-'+Date.now(),timestamp:record.created_at});write(STORAGE.audit,a);state.audit=a;
+}
+function renderAudit(){
+  if(!state.audit.length){$('audit-content').innerHTML='<div class="log-empty"><div class="log-empty-icon">⌁</div>No administrative activity has been recorded.</div>';return;}
+  $('audit-content').innerHTML=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Action</th><th>Target</th><th>Timestamp</th><th>Details</th></tr></thead><tbody>${[...state.audit].reverse().map(a=>`<tr><td>${esc(a.action)}</td><td>${esc(a.target)}</td><td>${esc(new Date(a.created_at||a.timestamp||Date.now()).toLocaleString('en-PH'))}</td><td>${esc(JSON.stringify(a.metadata||{}))}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function renderProfile(){
+  const p=state.profile||state.user||{};
+  $('profile-content').innerHTML=`<div class="data-card" style="max-width:650px"><div class="card-title">${esc(p.full_name||p.name||'')}</div><div class="muted">${esc(p.email||'')}</div><div class="score-row"><span>Role</span><strong>${esc(roleLabel(state.role))}</strong></div><div class="score-row"><span>Contact</span><strong>${esc(p.contact_number||'—')}</strong></div><div class="score-row"><span>Address</span><strong>${esc(p.address||'—')}</strong></div><div class="score-row"><span>Account status</span><strong>${esc(p.status||'active')}</strong></div>${state.role==='rider'?`<div class="score-row"><span>Verification</span><strong>${esc(state.riders.find(r=>r.profile_id===state.user.id)?.verification_status||'Pending')}</strong></div>`:''}</div>`;
+}
+
+function bindMisc(){
+  const dt=$('rpt-datetime');if(dt)dt.value=new Date().toISOString().slice(0,16);
+  const originalReportButtons=document.querySelectorAll('#panel-report .btn');if(originalReportButtons[0])originalReportButtons[0].onclick=generateReport;if(originalReportButtons[1])originalReportButtons[1].onclick=clearReport;
+  const actions=document.querySelectorAll('#report-actions .btn');if(actions[0])actions[0].onclick=printReport;if(actions[1])actions[1].onclick=saveReportLog;
+  $('clearReport')?.addEventListener('click',clearReport);
+  initTheme();
+  initSidebarCollapse();
+}
+
+/* ── Theme toggle (light / dark) ── */
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme',theme);
+  localStorage.setItem('geofare.theme',theme);
+  const btn=$('theme-toggle'); if(btn){btn.textContent=theme==='dark'?'☀️':'🌙';btn.title=theme==='dark'?'Switch to light mode':'Switch to dark mode';}
+}
+function initTheme(){
+  applyTheme(localStorage.getItem('geofare.theme')||'light');
+  $('theme-toggle')?.addEventListener('click',()=>{
+    const current=document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';
+    applyTheme(current==='dark'?'light':'dark');
+  });
+}
+
+/* ── Sidebar collapse toggle (desktop only) ── */
+function initSidebarCollapse(){
+  const btn=$('sidebar-collapse-btn'); if(!btn)return;
+  const collapsed=localStorage.getItem('geofare.sidebarCollapsed')==='1';
+  if(collapsed){$('sidebar').classList.add('collapsed');btn.textContent='⟩';}
+  btn.addEventListener('click',()=>{
+    const nowCollapsed=$('sidebar').classList.toggle('collapsed');
+    localStorage.setItem('geofare.sidebarCollapsed',nowCollapsed?'1':'0');
+    btn.textContent=nowCollapsed?'⟩':'⟨';
+    setTimeout(()=>map?.invalidateSize(),320);
+  });
+}
+function showLoading(b){$('loading-line')?.classList.toggle('active',b);}
+
+/* Existing mobile drawer behavior retained. */
+function useMyLocation(){
+  if(!navigator.geolocation){toast('Geolocation is not supported on this device.','error');return;}
+  setBusy(true,'Getting your location…');
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const {latitude:lat,longitude:lng}=pos.coords;
+    map.setView([lat,lng],15); const addr=await reverseGeocode(lat,lng);
+    if(state.currentMode==='pickup'){if(state.pickupMarker)map.removeLayer(state.pickupMarker);state.pickupMarker=L.marker([lat,lng],{icon:iconPickup}).addTo(map);$('pickup-addr').textContent=addr;if(!state.dropoffMarker)setMode('dropoff');}
+    else{if(state.dropoffMarker)map.removeLayer(state.dropoffMarker);state.dropoffMarker=L.marker([lat,lng],{icon:iconDropoff}).addTo(map);$('dropoff-addr').textContent=addr;}
+    if(state.pickupMarker&&state.dropoffMarker)await calculateFare();updateInstruction();setBusy(false);
+  },()=>{setBusy(false);toast('Could not get your location. Please allow location access.','error');},{enableHighAccuracy:false,timeout:10000});
+}
+
+/* Boot */
+setupAuthUI();bindMisc();setMode('pickup');renderMatrix();
+restoreSession().catch(err=>{console.error(err);$('auth-screen').classList.remove('hidden');authMessage('Unable to initialize GeoFare.');});
+</script>
+
+</body>
+</html>
